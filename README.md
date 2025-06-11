@@ -5,15 +5,36 @@
 
 ## Introductions
 
-Hi there! I'm Professor Franklin Frisby. Pleased to make your acquaintance. We'll be spending some time together, as I'm supposed to teach you a bit about functional programming. But enough about me, what about you? I'm hoping that you're at least a bit familiar with the JavaScript language, have a teensy bit of Object-Oriented experience, and fancy yourself a working class programmer. You don't need to have a PhD in Entomology, you just need to know how to find and kill some bugs.
+Hi there! I'm Professor Franklin Frisby. Pleased to make your acquaintance. We'll be 
+spending some time together, as I'm supposed to teach you a bit about functional 
+programming. But enough about me, what about you? I'm hoping that you're at least a bit 
+familiar with the JavaScript language, have a teensy bit of Object-Oriented experience, 
+and fancy yourself a working class programmer. You don't need to have a PhD in 
+Entomology, you just need to know how to find and kill some bugs.
 
-I won't assume that you have any previous functional programming knowledge, because we both know what happens when you assume. I will, however, expect you to have run into some of the unfavorable situations that arise when working with mutable state, unrestricted side effects, and unprincipled design. Now that we've been properly introduced, let's get on with it.
+I won't assume that you have any previous functional programming knowledge, because we 
+both know what happens when you assume. I will, however, expect you to have run into 
+some of the unfavorable situations that arise when working with mutable state, 
+unrestricted side effects, and unprincipled design. Now that we've been properly 
+introduced, let's get on with it.
 
-The purpose of this chapter is to give you a feel for what we're after when we write functional programs. In order to be able to understand the following chapters, we must have some idea about what makes a program *functional*. Otherwise we'll find ourselves scribbling aimlessly, avoiding objects at all costs - a clumsy endeavor indeed. We need a clear bullseye to hurl our code at, some celestial compass for when the waters get rough.
+The purpose of this chapter is to give you a feel for what we're after when we write 
+functional programs. In order to be able to understand the following chapters, we must 
+have some idea about what makes a program *functional*. Otherwise we'll find ourselves 
+scribbling aimlessly, avoiding objects at all costs - a clumsy endeavor indeed. We need 
+a clear bullseye to hurl our code at, some celestial compass for when the waters get 
+rough.
 
-Now, there are some general programming principles - various acronymic credos that guide us through the dark tunnels of any application: DRY (don't repeat yourself), YAGNI (ya ain't gonna need it), loose coupling high cohesion, the principle of least surprise, single responsibility, and so on.
+Now, there are some general programming principles - various acronymic credos that guide 
+us through the dark tunnels of any application: DRY (don't repeat yourself), YAGNI (ya 
+ain't gonna need it), loose coupling high cohesion, the principle of least surprise, 
+single responsibility, and so on.
 
-I won't belabor you by listing each and every guideline I've heard throughout the years... The point of the matter is that they hold up in a functional setting, although they're merely tangential to our ultimate goal. What I'd like you to get a feel for now, before we get any further, is our intention when we poke and prod at the keyboard; our functional Xanadu.
+I won't belabor you by listing each and every guideline I've heard throughout the 
+years... The point of the matter is that they hold up in a functional setting, although 
+they're merely tangential to our ultimate goal. What I'd like you to get a feel for now, 
+before we get any further, is our intention when we poke and prod at the keyboard; our 
+functional Xanadu.
 
 <!--BREAK-->
 
