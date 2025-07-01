@@ -1,0 +1,106 @@
+<h1 id="chapter-04-currying">Chapter 04: Currying</h1>
+<h2 id="can-t-live-if-livin-is-without-you">Can&#39;t Live If Livin&#39; Is without You</h2>
+<p>My Dad once explained how there are certain things one can live without until one acquires them. A microwave is one such thing. Smart phones, another. The older folks among us will remember a fulfilling life sans internet. For me, currying is on this list.</p>
+<p>The concept is simple: You can call a function with fewer arguments than it expects. It returns a function that takes the remaining arguments.</p>
+<p>You can choose to call it all at once or simply feed in each argument piecemeal.</p>
+<pre><code class="lang-js">const <span class="hljs-keyword">add</span><span class="bash"> = x =&gt; y =&gt; x + y;
+</span>const increment = <span class="hljs-keyword">add</span><span class="bash">(1);
+</span>const addTen = <span class="hljs-keyword">add</span><span class="bash">(10);
+</span>
+increment(<span class="hljs-number">2</span>); // <span class="hljs-number">3</span>
+addTen(<span class="hljs-number">2</span>); // <span class="hljs-number">12</span>
+</code></pre>
+<p>Here we&#39;ve made a function <code>add</code> that takes one argument and returns a function. By calling it, the returned function remembers the first argument from then on via the closure. Calling it with both arguments all at once is a bit of a pain, however, so we can use a special helper function called <code>curry</code> to make defining and calling functions like this easier.</p>
+<p>Let&#39;s set up a few curried functions for our enjoyment. From now on, we&#39;ll summon our <code>curry</code>
+function defined in the <a href="./appendix_a.md">Appendix A - Essential Function Support</a>. </p>
+<pre><code class="lang-js">const match = curry((<span class="hljs-name">what</span>, s) =&gt; s.match(<span class="hljs-name">what</span>))<span class="hljs-comment">;</span>
+const replace = curry((<span class="hljs-name">what</span>, replacement, s) =&gt; s.replace(<span class="hljs-name">what</span>, replacement))<span class="hljs-comment">;</span>
+const filter = curry((<span class="hljs-name">f</span>, xs) =&gt; xs.filter(<span class="hljs-name">f</span>))<span class="hljs-comment">;</span>
+const map = curry((<span class="hljs-name">f</span>, xs) =&gt; xs.map(<span class="hljs-name">f</span>))<span class="hljs-comment">;</span>
+</code></pre>
+<p>The pattern I&#39;ve followed is a simple, but important one. I&#39;ve strategically positioned the data we&#39;re operating on (String, Array) as the last argument. It will become clear as to why upon use.</p>
+<p>(The syntax <code>/r/g</code>  is a regular expression that means <em>match every letter &#39;r&#39;</em>. Read <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions">more about regular expressions</a> if you like.)</p>
+<pre><code class="lang-js">match(<span class="hljs-regexp">/r/g</span>, <span class="hljs-string">'hello world'</span>); <span class="hljs-regexp">//</span> [ <span class="hljs-string">'r'</span> ]
+
+const hasLetterR = match(<span class="hljs-regexp">/r/g</span>); <span class="hljs-regexp">//</span> x =&gt; x.match(<span class="hljs-regexp">/r/g</span>)
+hasLetterR(<span class="hljs-string">'hello world'</span>); <span class="hljs-regexp">//</span> [ <span class="hljs-string">'r'</span> ]
+hasLetterR(<span class="hljs-string">'just j and s and t etc'</span>); <span class="hljs-regexp">//</span> null
+
+filter(hasLetterR, [<span class="hljs-string">'rock and roll'</span>, <span class="hljs-string">'smooth jazz'</span>]); <span class="hljs-regexp">//</span> [<span class="hljs-string">'rock and roll'</span>]
+
+const removeStringsWithoutRs = filter(hasLetterR); <span class="hljs-regexp">//</span> xs =&gt; xs.filter(x =&gt; x.match(<span class="hljs-regexp">/r/g</span>))
+removeStringsWithoutRs([<span class="hljs-string">'rock and roll'</span>, <span class="hljs-string">'smooth jazz'</span>, <span class="hljs-string">'drum circle'</span>]); <span class="hljs-regexp">//</span> [<span class="hljs-string">'rock and roll'</span>, <span class="hljs-string">'drum circle'</span>]
+
+const noVowels = replace(<span class="hljs-regexp">/[aeiou]/ig</span>); <span class="hljs-regexp">//</span> (r,x) =&gt; x.replace(<span class="hljs-regexp">/[aeiou]/ig</span>, r)
+const censored = noVowels(<span class="hljs-string">'*'</span>); <span class="hljs-regexp">//</span> x =&gt; x.replace(<span class="hljs-regexp">/[aeiou]/ig</span>, <span class="hljs-string">'*'</span>)
+censored(<span class="hljs-string">'Chocolate Rain'</span>); <span class="hljs-regexp">//</span> <span class="hljs-string">'Ch*c*l*t* R**n'</span>
+</code></pre>
+<p>What&#39;s demonstrated here is the ability to &quot;pre-load&quot; a function with an argument or two in order to receive a new function that remembers those arguments.</p>
+<p>I encourage you to clone the Mostly Adequate repository (<code>git clone
+https://github.com/MostlyAdequate/mostly-adequate-guide.git</code>), copy the code above and have a
+go at it in the REPL. The curry function, as well as actually anything defined in the appendixes,
+are available in the <code>support/index.js</code> module.</p>
+<p>Alternatively, have a look at a published version on <code>npm</code>:</p>
+<pre><code><span class="hljs-selector-tag">npm</span> <span class="hljs-selector-tag">install</span> @<span class="hljs-keyword">mostly</span>-<span class="hljs-keyword">adequate</span>/<span class="hljs-keyword">support</span>
+</code></pre><h2 id="more-than-a-pun-special-sauce">More Than a Pun / Special Sauce</h2>
+<p>Currying is useful for many things. We can make new functions just by giving our base functions some arguments as seen in <code>hasLetterR</code>, <code>removeStringsWithoutRs</code>, and <code>censored</code>.</p>
+<p>We also have the ability to transform any function that works on single elements into a function that works on arrays simply by wrapping it with <code>map</code>:</p>
+<pre><code class="lang-js"><span class="hljs-attribute">const getChildren</span> = x =&gt; x.childNodes;
+<span class="hljs-attribute">const allTheChildren</span> = map(getChildren);
+</code></pre>
+<p>Giving a function fewer arguments than it expects is typically called <em>partial application</em>. Partially applying a function can remove a lot of boiler plate code. Consider what the above <code>allTheChildren</code> function would be with the uncurried <code>map</code> from lodash (note the arguments are in a different order):</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> allTheChildren = <span class="hljs-function"><span class="hljs-params">elements</span> =&gt;</span> map(elements, getChildren);
+</code></pre>
+<p>We typically don&#39;t define functions that work on arrays, because we can just call <code>map(getChildren)</code> inline. Same with <code>sort</code>, <code>filter</code>, and other higher order functions (a <em>higher order function</em> is a function that takes or returns a function).</p>
+<p>When we spoke about <em>pure functions</em>, we said they take 1 input to 1 output. Currying does exactly this: each single argument returns a new function expecting the remaining arguments. That, old sport, is 1 input to 1 output.</p>
+<p>No matter if the output is another function - it qualifies as pure. We do allow more than one argument at a time, but this is seen as merely removing the extra <code>()</code>&#39;s for convenience.</p>
+<h2 id="in-summary">In Summary</h2>
+<p>Currying is handy and I very much enjoy working with curried functions on a daily basis. It is a tool for the belt that makes functional programming less verbose and tedious.</p>
+<p>We can make new, useful functions on the fly simply by passing in a few arguments and as a bonus, we&#39;ve retained the mathematical function definition despite multiple arguments.</p>
+<p>Let&#39;s acquire another essential tool called <code>compose</code>.</p>
+<p><a href="ch05.md">Chapter 05: Coding by Composing</a></p>
+<h2 id="exercises">Exercises</h2>
+<h4 id="note-about-exercises">Note about Exercises</h4>
+<p>Throughout the book, you might encounter an &#39;Exercises&#39; section like this one. Exercises can be
+done directly in-browser provided you&#39;re reading from <a href="https://mostly-adequate.gitbooks.io/mostly-adequate-guide">gitbook</a> (recommended).</p>
+<p>Note that, for all exercises of the book, you always have a handful of helper functions
+available in the global scope. Hence, anything that is defined in <a href="./appendix_a.md">Appendix A</a>,
+<a href="./appendix_b.md">Appendix B</a> and <a href="./appendix_c.md">Appendix C</a> is available for you! And, as
+if it wasn&#39;t enough, some exercises will also define functions specific to the problem
+they present; as a matter of fact, consider them available as well.</p>
+<blockquote>
+<p>Hint: you can submit your solution by doing <code>Ctrl + Enter</code> in the embedded editor!</p>
+</blockquote>
+<h4 id="running-exercises-on-your-machine-optional-">Running Exercises on Your Machine (optional)</h4>
+<p>Should you prefer to do exercises directly in files using your own editor:</p>
+<ul>
+<li>clone the repository (<code>git clone git@github.com:MostlyAdequate/mostly-adequate-guide.git</code>)</li>
+<li>go in the <em>exercises</em> section (<code>cd mostly-adequate-guide/exercises</code>)</li>
+<li>be sure to be using the recommended node version v10.22.1 (e.g. <code>nvm install</code>). More on this in <a href="./README.md#about-the-nodejs-version">the readme of the book</a></li>
+<li>install the necessary plumbing using <a href="https://docs.npmjs.com/downloading-and-installing-node-js-and-npm">npm</a> (<code>npm install</code>)</li>
+<li>complete answers by modifying the files named <em>exercise_*</em> in the corresponding chapter&#39;s folder </li>
+<li>run the correction with npm (e.g. <code>npm run ch04</code>)</li>
+</ul>
+<p>Unit tests will run against your answers and provide hints in case of mistake. By the by, the
+answers to the exercises are available in files named <em>solution_*</em>.</p>
+<h4 id="let-s-practice-">Let&#39;s Practice!</h4>
+<p>{% exercise %}<br>Refactor to remove all arguments by partially applying the function.  </p>
+<p>{% initial src=&quot;./exercises/ch04/exercise_a.js#L3;&quot; %}  </p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> words = <span class="hljs-built_in">str</span> =&gt; <span class="hljs-built_in">split</span>(<span class="hljs-string">' '</span>, <span class="hljs-built_in">str</span>);
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch04/solution_a.js&quot; %}<br>{% validation src=&quot;./exercises/ch04/validation_a.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
+<hr>
+<p>{% exercise %}<br>Refactor to remove all arguments by partially applying the functions.  </p>
+<p>{% initial src=&quot;./exercises/ch04/exercise_b.js#L3;&quot; %}  </p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> filterQs = <span class="hljs-function"><span class="hljs-params">xs</span> =&gt;</span> filter(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> match(<span class="hljs-regexp">/q/i</span>, x), xs);
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch04/solution_b.js&quot; %}<br>{% validation src=&quot;./exercises/ch04/validation_b.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
+<hr>
+<p>Considering the following function:</p>
+<pre><code class="lang-js">const keepHighest = (<span class="hljs-name">x</span>, y) =&gt; (<span class="hljs-name">x</span> &gt;= y ? x : y)<span class="hljs-comment">;</span>
+</code></pre>
+<p>{% exercise %}<br>Refactor <code>max</code> to not reference any arguments using the helper function <code>keepHighest</code>.  </p>
+<p>{% initial src=&quot;./exercises/ch04/exercise_c.js#L7;&quot; %}  </p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> max = <span class="hljs-function"><span class="hljs-params">xs</span> =&gt;</span> reduce(<span class="hljs-function">(<span class="hljs-params">acc, x</span>) =&gt;</span> (x &gt;= acc ? x : acc), -<span class="hljs-literal">Infinity</span>, xs);
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch04/solution_c.js&quot; %}<br>{% validation src=&quot;./exercises/ch04/validation_c.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
