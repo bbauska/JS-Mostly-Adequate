@@ -1,0 +1,218 @@
+<h1 id="chapter-12-traversing-the-stone">Chapter 12: Traversing the Stone</h1>
+<p>So far, in our cirque du conteneur, you&#39;ve seen us tame the ferocious <a href="ch08.md#my-first-functor">functor</a>, bending it to our will to perform any operation that strikes our fancy. You&#39;ve been dazzled by the juggling of many dangerous effects at once using function <a href="ch10.md">application</a> to collect the results. Sat there in amazement as containers vanished in thin air by <a href="ch09.md">joining</a> them together. At the side effect sideshow, we&#39;ve seen them <a href="ch08.md#a-spot-of-theory">composed</a> into one. And most recently, we&#39;ve ventured beyond what&#39;s natural and <a href="ch11.md">transformed</a> one type into another before your very eyes.</p>
+<p>And now for our next trick, we&#39;ll look at traversals. We&#39;ll watch types soar over one another as if they were trapeze artists holding our value intact. We&#39;ll reorder effects like the trolleys in a tilt-a-whirl. When our containers get intertwined like the limbs of a contortionist, we can use this interface to straighten things out. We&#39;ll witness different effects with different orderings. Fetch me my pantaloons and slide whistle, let&#39;s get started.</p>
+<h2 id="types-n-types">Types n&#39; Types</h2>
+<p>Let&#39;s get weird:</p>
+<pre><code class="lang-js">// readFile <span class="hljs-type">::</span> FileName -&gt; <span class="hljs-built_in">Task</span> Error <span class="hljs-built_in">String</span>
+
+// firstWords <span class="hljs-type">::</span> <span class="hljs-built_in">String</span> -&gt; <span class="hljs-built_in">String</span>
+<span class="hljs-keyword">const</span> firstWords = compose(intercalate(<span class="hljs-string">' '</span>), take(<span class="hljs-number">3</span>), split(<span class="hljs-string">' '</span>));
+
+// tldr <span class="hljs-type">::</span> FileName -&gt; <span class="hljs-built_in">Task</span> Error <span class="hljs-built_in">String</span>
+<span class="hljs-keyword">const</span> tldr = compose(map(firstWords), readFile);
+
+map(tldr, ['file1', 'file2']);
+// [<span class="hljs-built_in">Task</span>('hail the monarchy'), <span class="hljs-built_in">Task</span>('smash the patriarchy')]
+</code></pre>
+<p>Here we read a bunch of files and end up with a useless array of tasks. How might we fork each one of these? It would be most agreeable if we could switch the types around to have <code>Task Error [String]</code> instead of <code>[Task Error String]</code>. That way, we&#39;d have one future value holding all the results, which is much more amenable to our async needs than several future values arriving at their leisure.</p>
+<p>Here&#39;s one last example of a sticky situation:</p>
+<pre><code class="lang-js">// getAttribute :: <span class="hljs-keyword">String</span> -&gt; <span class="hljs-keyword">Node</span> <span class="hljs-title">-&gt; Maybe</span> <span class="hljs-keyword">String</span>
+// $ :: Selector -&gt; IO <span class="hljs-keyword">Node</span>
+
+<span class="hljs-title">// getControlNode</span> :: Selector -&gt; IO (Maybe (IO <span class="hljs-keyword">Node</span><span class="hljs-title">))
+const</span> getControlNode = compose(map(map($)), map(getAttribute('aria-controls')), $);
+</code></pre>
+<p>Look at those <code>IO</code>s longing to be together. It&#39;d be just lovely to <code>join</code> them, let them dance cheek to cheek, but alas a <code>Maybe</code> stands between them like a chaperone at prom. Our best move here would be to shift their positions next to one another, that way each type can be together at last and our signature can be simplified to <code>IO (Maybe Node)</code>.</p>
+<h2 id="type-feng-shui">Type Feng Shui</h2>
+<p>The <em>Traversable</em> interface consists of two glorious functions: <code>sequence</code> and <code>traverse</code>.</p>
+<p>Let&#39;s rearrange our types using <code>sequence</code>:</p>
+<pre><code class="lang-js">sequence(List.<span class="hljs-keyword">of</span>, Maybe.<span class="hljs-keyword">of</span>([<span class="hljs-symbol">'the</span> facts'])); // [Just(<span class="hljs-symbol">'the</span> facts')]
+sequence(<span class="hljs-keyword">Task</span>.<span class="hljs-keyword">of</span>, <span class="hljs-keyword">new</span> Map({ a: <span class="hljs-keyword">Task</span>.<span class="hljs-keyword">of</span>(<span class="hljs-number">1</span>), b: <span class="hljs-keyword">Task</span>.<span class="hljs-keyword">of</span>(<span class="hljs-number">2</span>) })); // <span class="hljs-keyword">Task</span>(Map({ a: <span class="hljs-number">1</span>, b: <span class="hljs-number">2</span> }))
+sequence(IO.<span class="hljs-keyword">of</span>, Either.<span class="hljs-keyword">of</span>(IO.<span class="hljs-keyword">of</span>(<span class="hljs-symbol">'buckle</span> my shoe'))); // IO(Right(<span class="hljs-symbol">'buckle</span> my shoe'))
+sequence(Either.<span class="hljs-keyword">of</span>, [Either.<span class="hljs-keyword">of</span>(<span class="hljs-symbol">'wing</span>')]); // Right([<span class="hljs-symbol">'wing</span>'])
+sequence(<span class="hljs-keyword">Task</span>.<span class="hljs-keyword">of</span>, left(<span class="hljs-symbol">'wing</span>')); // <span class="hljs-keyword">Task</span>(Left(<span class="hljs-symbol">'wing</span>'))
+</code></pre>
+<p>See what has happened here? Our nested type gets turned inside out like a pair of leather trousers on a humid summer night. The inner functor is shifted to the outside and vice versa. It should be known that <code>sequence</code> is bit particular about its arguments. It looks like this:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// sequence :: (Traversable t, Applicative f) =&gt; (a -&gt; f a) -&gt; t (f a) -&gt; f (t a)</span>
+<span class="hljs-keyword">const</span> sequence = curry(<span class="hljs-function">(<span class="hljs-params"><span class="hljs-keyword">of</span>, x</span>) =&gt;</span> x.sequence(<span class="hljs-keyword">of</span>));
+</code></pre>
+<p>Let&#39;s start with the second argument. It must be a <em>Traversable</em> holding an <em>Applicative</em>, which sounds quite restrictive, but just so happens to be the case more often than not. It is the <code>t (f a)</code> which gets turned into a <code>f (t a)</code>. Isn&#39;t that expressive? It&#39;s clear as day the two types do-si-do around each other. That first argument there is merely a crutch and only necessary in an untyped language. It is a type constructor (our <em>of</em>) provided so that we can invert map-reluctant types like <code>Left</code> - more on that in a minute.</p>
+<p>Using <code>sequence</code>, we can shift types around with the precision of a sidewalk thimblerigger. But how does it work? Let&#39;s look at how a type, say <code>Either</code>, would implement it:</p>
+<pre><code class="lang-js"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Right</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Either</span> </span>{
+  <span class="hljs-comment">// ...</span>
+  sequence(of) {
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.$value.map(<span class="hljs-type">Either</span>.of);
+  }
+}
+</code></pre>
+<p>Ah yes, if our <code>$value</code> is a functor (it must be an applicative, in fact), we can simply <code>map</code> our constructor to leap frog the type.</p>
+<p>You may have noticed that we&#39;ve ignored the <code>of</code> entirely. It is passed in for the occasion where mapping is futile, as is the case with <code>Left</code>:</p>
+<pre><code class="lang-js"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Left</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Either</span> </span>{
+  <span class="hljs-comment">// ...</span>
+  sequence(of) {
+    <span class="hljs-keyword">return</span> of(<span class="hljs-keyword">this</span>);
+  }
+}
+</code></pre>
+<p>We&#39;d like the types to always end up in the same arrangement, therefore it is necessary for types like <code>Left</code> who don&#39;t actually hold our inner applicative to get a little help in doing so. The <em>Applicative</em> interface requires that we first have a <em>Pointed Functor</em> so we&#39;ll always have a <code>of</code> to pass in. In a language with a type system, the outer type can be inferred from the signature and does not need to be explicitly given.</p>
+<h2 id="effect-assortment">Effect Assortment</h2>
+<p>Different orders have different outcomes where our containers are concerned. If I have <code>[Maybe a]</code>, that&#39;s a collection of possible values whereas if I have a <code>Maybe [a]</code>, that&#39;s a possible collection of values. The former indicates we&#39;ll be forgiving and keep &quot;the good ones&quot;, while the latter means it&#39;s an &quot;all or nothing&quot; type of situation. Likewise, <code>Either Error (Task Error a)</code> could represent a client side validation and <code>Task Error (Either Error a)</code> could be a server side one. Types can be swapped to give us different effects.</p>
+<pre><code class="lang-js"><span class="hljs-comment">// fromPredicate :: (a -&gt; Bool) -&gt; a -&gt; Either e a</span>
+
+<span class="hljs-comment">// partition :: (a -&gt; Bool) -&gt; [a] -&gt; [Either e a]</span>
+<span class="hljs-keyword">const</span> partition = <span class="hljs-function"><span class="hljs-params">f</span> =&gt;</span> map(fromPredicate(f));
+
+<span class="hljs-comment">// validate :: (a -&gt; Bool) -&gt; [a] -&gt; Either e [a]</span>
+<span class="hljs-keyword">const</span> validate = <span class="hljs-function"><span class="hljs-params">f</span> =&gt;</span> traverse(Either.of, fromPredicate(f));
+</code></pre>
+<p>Here we have two different functions based on if we <code>map</code> or <code>traverse</code>.  The first, <code>partition</code> will give us an array of <code>Left</code>s and <code>Right</code>s according to the predicate function. This is useful to keep precious data around for future use rather than filtering it out with the bathwater. <code>validate</code> instead will give us the first item that fails the predicate in <code>Left</code>, or all the items in <code>Right</code> if everything is hunky dory. By choosing a different type order, we get different behavior.</p>
+<p>Let&#39;s look at the <code>traverse</code> function of <code>List</code>, to see how the <code>validate</code> method is made. </p>
+<pre><code class="lang-js">traverse(<span class="hljs-keyword">of</span>, fn) {
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.$value.reduce(
+      <span class="hljs-function">(<span class="hljs-params">f, a</span>) =&gt;</span> fn(a).map(<span class="hljs-function"><span class="hljs-params">b</span> =&gt;</span> bs =&gt; bs.concat(b)).ap(f),
+      <span class="hljs-keyword">of</span>(<span class="hljs-keyword">new</span> List([])),
+    );
+  }
+</code></pre>
+<p>This just runs a <code>reduce</code> on the list. The reduce function is <code>(f, a) =&gt; fn(a).map(b =&gt; bs =&gt; bs.concat(b)).ap(f)</code>, which looks a bit scary, so let&#39;s step through it.</p>
+<ol>
+<li><p><code>reduce(..., ...)</code></p>
+<p>Remember the signature of <code>reduce :: [a] -&gt; (f -&gt; a -&gt; f) -&gt; f -&gt; f</code>. The first argument is actually provided by the dot-notation on <code>$value</code>, so it&#39;s a list of things. 
+Then we need a function from a <code>f</code> (the accumulator) and a <code>a</code> (the iteree) to return us a new accumulator. </p>
+</li>
+<li><p><code>of(new List([]))</code></p>
+<p>The seed value is <code>of(new List([]))</code>, which in our case is <code>Right([]) :: Either e [a]</code>. Notice that <code>Either e [a]</code> will also be our final resulting type!</p>
+</li>
+<li><p><code>fn :: Applicative f =&gt; a -&gt; f a</code></p>
+<p>If we apply it to our example above, <code>fn</code> is actually <code>fromPredicate(f) :: a -&gt; Either e a</code>.  </p>
+<blockquote>
+<p>fn(a) :: Either e a</p>
+</blockquote>
+</li>
+<li><p><code>.map(b =&gt; bs =&gt; bs.concat(b))</code></p>
+<p>When <code>Right</code>, <code>Either.map</code> passes the right value to the function and returns a new <code>Right</code> with the result. In this case the function has one parameter (<code>b</code>), and returns another function (<code>bs =&gt; bs.concat(b)</code>, where <code>b</code> is in scope due to the closure). When <code>Left</code>, the left value is returned.  </p>
+<blockquote>
+<p>fn(a).map(b =&gt; bs =&gt; bs.concat(b)) :: Either e ([a] -&gt; [a])</p>
+</blockquote>
+</li>
+<li><p>.<code>ap(f)</code></p>
+<p>Remember that <code>f</code> is an Applicative here, so we can apply the function <code>bs =&gt; bs.concat(b)</code> to whatever value <code>bs :: [a]</code> is in <code>f</code>. Fortunately for us, <code>f</code> comes from our initial seed and has the following type: <code>f :: Either e [a]</code> which is by the way, preserved when we apply <code>bs =&gt; bs.concat(b)</code>. 
+When <code>f</code> is <code>Right</code>, this calls <code>bs =&gt; bs.concat(b)</code>, which returns a <code>Right</code> with the item added to the list. When <code>Left</code>, the left value (from the previous step or previous iteration respectively) is returned. </p>
+<blockquote>
+<p>fn(a).map(b =&gt; bs =&gt; bs.concat(b)).ap(f) :: Either e [a]</p>
+</blockquote>
+</li>
+</ol>
+<p>This apparently miraculous transformation is achieved with just 6 measly lines of code in <code>List.traverse</code>, and is accomplished with <code>of</code>, <code>map</code> and <code>ap</code>, so will work for any Applicative Functor. This is a great example 
+of how those abstraction can help to write highly generic code with only a few assumptions (that can, incidentally, be declared and checked at the type level!).</p>
+<h2 id="waltz-of-the-types">Waltz of the Types</h2>
+<p>Time to revisit and clean our initial examples.</p>
+<pre><code class="lang-js">// readFile <span class="hljs-type">::</span> FileName -&gt; <span class="hljs-built_in">Task</span> Error <span class="hljs-built_in">String</span>
+
+// firstWords <span class="hljs-type">::</span> <span class="hljs-built_in">String</span> -&gt; <span class="hljs-built_in">String</span>
+<span class="hljs-keyword">const</span> firstWords = compose(intercalate(<span class="hljs-string">' '</span>), take(<span class="hljs-number">3</span>), split(<span class="hljs-string">' '</span>));
+
+// tldr <span class="hljs-type">::</span> FileName -&gt; <span class="hljs-built_in">Task</span> Error <span class="hljs-built_in">String</span>
+<span class="hljs-keyword">const</span> tldr = compose(map(firstWords), readFile);
+
+traverse(<span class="hljs-built_in">Task</span>.of, tldr, ['file1', 'file2']);
+// <span class="hljs-built_in">Task</span>(['hail the monarchy', 'smash the patriarchy']);
+</code></pre>
+<p>Using <code>traverse</code> instead of <code>map</code>, we&#39;ve successfully herded those unruly <code>Task</code>s into a nice coordinated array of results. This is like <code>Promise.all()</code>, if you&#39;re familiar, except it isn&#39;t just a one-off, custom function, no, this works for any <em>traversable</em> type. These mathematical apis tend to capture most things we&#39;d like to do in an interoperable, reusable way, rather than each library reinventing these functions for a single type.</p>
+<p>Let&#39;s clean up the last example for closure (no, not that kind):</p>
+<pre><code class="lang-js">// getAttribute :: <span class="hljs-keyword">String</span> -&gt; <span class="hljs-keyword">Node</span> <span class="hljs-title">-&gt; Maybe</span> <span class="hljs-keyword">String</span>
+// $ :: Selector -&gt; IO <span class="hljs-keyword">Node</span>
+
+<span class="hljs-title">// getControlNode</span> :: Selector -&gt; IO (Maybe <span class="hljs-keyword">Node</span><span class="hljs-title">)
+const</span> getControlNode = compose(chain(traverse(IO.of, $)), map(getAttribute('aria-controls')), $);
+</code></pre>
+<p>Instead of <code>map(map($))</code> we have <code>chain(traverse(IO.of, $))</code> which inverts our types as it maps then flattens the two <code>IO</code>s via <code>chain</code>.</p>
+<h2 id="no-law-and-order">No Law and Order</h2>
+<p>Well now, before you get all judgemental and bang the backspace button like a gavel to retreat from the chapter, take a moment to recognize that these laws are useful code guarantees. &#39;Tis my conjecture that the goal of most program architecture is an attempt to place useful restrictions on our code to narrow the possibilities, to guide us into the answers as designers and readers.</p>
+<p>An interface without laws is merely indirection. Like any other mathematical structure, we must expose properties for our own sanity. This has a similar effect as encapsulation since it protects the data, enabling us to swap out the interface with another law abiding citizen.</p>
+<p>Come along now, we&#39;ve got some laws to suss out.</p>
+<h3 id="identity">Identity</h3>
+<pre><code class="lang-js">const identity1 = compose(<span class="hljs-keyword">sequence</span>(Identity.<span class="hljs-keyword">of</span>), <span class="hljs-keyword">map</span>(Identity.<span class="hljs-keyword">of</span>));
+const identity2 = Identity.<span class="hljs-keyword">of</span>;
+
+// test it <span class="hljs-keyword">out</span> <span class="hljs-keyword">with</span> Right
+identity1(Either.<span class="hljs-keyword">of</span>(<span class="hljs-symbol">'stuff</span>'));
+// Identity(Right(<span class="hljs-symbol">'stuff</span>'))
+
+identity2(Either.<span class="hljs-keyword">of</span>(<span class="hljs-symbol">'stuff</span>'));
+// Identity(Right(<span class="hljs-symbol">'stuff</span>'))
+</code></pre>
+<p>This should be straightforward. If we place an <code>Identity</code> in our functor, then turn it inside out with <code>sequence</code> that&#39;s the same as just placing it on the outside to begin with. We chose <code>Right</code> as our guinea pig as it is easy to try the law and inspect. An arbitrary functor there is normal, however, the use of a concrete functor here, namely <code>Identity</code> in the law itself might raise some eyebrows. Remember a <a href="ch05.md#category-theory">category</a> is defined by morphisms between its objects that have associative composition and identity. When dealing with the category of functors, natural transformations are the morphisms and <code>Identity</code> is, well identity. The <code>Identity</code> functor is as fundamental in demonstrating laws as our <code>compose</code> function. In fact, we should give up the ghost and follow suit with our <a href="ch08.md#a-spot-of-theory">Compose</a> type:</p>
+<h3 id="composition">Composition</h3>
+<pre><code class="lang-js">const comp1 = compose(<span class="hljs-name">sequence</span>(<span class="hljs-name">Compose</span>.of), map(<span class="hljs-name">Compose</span>.of))<span class="hljs-comment">;</span>
+const comp2 = (<span class="hljs-name">Fof</span>, Gof) =&gt; compose(<span class="hljs-name">Compose</span>.of, map(<span class="hljs-name">sequence</span>(<span class="hljs-name">Gof</span>)), sequence(<span class="hljs-name">Fof</span>))<span class="hljs-comment">;</span>
+
+
+// Test it out with some types we have lying around
+comp1(<span class="hljs-name">Identity</span>(<span class="hljs-name">Right</span>([true])))<span class="hljs-comment">;</span>
+// Compose(<span class="hljs-name">Right</span>([Identity(<span class="hljs-name">true</span>)]))
+
+comp2(<span class="hljs-name">Either</span>.of, Array)(<span class="hljs-name">Identity</span>(<span class="hljs-name">Right</span>([true])))<span class="hljs-comment">;</span>
+// Compose(<span class="hljs-name">Right</span>([Identity(<span class="hljs-name">true</span>)]))
+</code></pre>
+<p>This law preserves composition as one would expect: if we swap compositions of functors, we shouldn&#39;t see any surprises since the composition is a functor itself. We arbitrarily chose <code>true</code>, <code>Right</code>, <code>Identity</code>, and <code>Array</code> to test it out. Libraries like <a href="https://hackage.haskell.org/package/QuickCheck">quickcheck</a> or <a href="http://jsverify.github.io/">jsverify</a> can help us test the law by fuzz testing the inputs.</p>
+<p>As a natural consequence of the above law, we get the ability to <a href="https://www.cs.ox.ac.uk/jeremy.gibbons/publications/iterator.pdf">fuse traversals</a>, which is nice from a performance standpoint.</p>
+<h3 id="naturality">Naturality</h3>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> natLaw1 = <span class="hljs-function">(<span class="hljs-params"><span class="hljs-keyword">of</span>, nt</span>) =&gt;</span> compose(nt, sequence(<span class="hljs-keyword">of</span>));
+<span class="hljs-keyword">const</span> natLaw2 = <span class="hljs-function">(<span class="hljs-params"><span class="hljs-keyword">of</span>, nt</span>) =&gt;</span> compose(sequence(<span class="hljs-keyword">of</span>), map(nt));
+
+<span class="hljs-comment">// test with a random natural transformation and our friendly Identity/Right functors.</span>
+
+<span class="hljs-comment">// maybeToEither :: Maybe a -&gt; Either () a</span>
+<span class="hljs-keyword">const</span> maybeToEither = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> (x.$value ? <span class="hljs-keyword">new</span> Right(x.$value) : <span class="hljs-keyword">new</span> Left());
+
+natLaw1(Maybe.of, maybeToEither)(Identity.of(Maybe.of(<span class="hljs-string">'barlow one'</span>)));
+<span class="hljs-comment">// Right(Identity('barlow one'))</span>
+
+natLaw2(Either.of, maybeToEither)(Identity.of(Maybe.of(<span class="hljs-string">'barlow one'</span>)));
+<span class="hljs-comment">// Right(Identity('barlow one'))</span>
+</code></pre>
+<p>This is similar to our identity law. If we first swing the types around then run a natural transformation on the outside, that should equal mapping a natural transformation, then flipping the types.</p>
+<p>A natural consequence of this law is:</p>
+<pre><code class="lang-js">traverse(A.<span class="hljs-keyword">of</span>, A.<span class="hljs-keyword">of</span>) === A.<span class="hljs-keyword">of</span>;
+</code></pre>
+<p>Which, again, is nice from a performance standpoint.</p>
+<h2 id="in-summary">In Summary</h2>
+<p><em>Traversable</em> is a powerful interface that gives us the ability to rearrange our types with the ease of a telekinetic interior decorator. We can achieve different effects with different orders as well as iron out those nasty type wrinkles that keep us from <code>join</code>ing them down. Next, we&#39;ll take a bit of a detour to see one of the most powerful interfaces of functional programming and perhaps even algebra itself: <a href="ch13.md">Monoids bring it all together</a></p>
+<h2 id="exercises">Exercises</h2>
+<p>Considering the following elements:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// httpGet :: Route -&gt; Task Error JSON</span>
+
+<span class="hljs-comment">// routes :: Map Route Route</span>
+<span class="hljs-keyword">const</span> routes = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>({ <span class="hljs-string">'/'</span>: <span class="hljs-string">'/'</span>, <span class="hljs-string">'/about'</span>: <span class="hljs-string">'/about'</span> });
+</code></pre>
+<p>{% exercise %}<br>Use the traversable interface to change the type signature of <code>getJsons</code> to
+Map Route Route → Task Error (Map Route JSON)</p>
+<p>{% initial src=&quot;./exercises/ch12/exercise_a.js#L11;&quot; %}  </p>
+<pre><code class="lang-js">// getJsons :: <span class="hljs-keyword">Map</span> Route Route -&gt; <span class="hljs-keyword">Map</span> Route (Task <span class="hljs-literal">Error</span> JSON)
+const getJsons = <span class="hljs-keyword">map</span>(httpGet);
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch12/solution_a.js&quot; %}<br>{% validation src=&quot;./exercises/ch12/validation_a.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
+<hr>
+<p>We now define the following validation function:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// validate :: Player -&gt; Either String Player</span>
+const validate = <span class="hljs-built_in">player</span> =&gt; (<span class="hljs-built_in">player</span>.<span class="hljs-built_in">name</span> ? Either.of(<span class="hljs-built_in">player</span>) : left(<span class="hljs-string">'must have name'</span>));
+</code></pre>
+<p>{% exercise %}<br>Using traversable, and the <code>validate</code> function, update <code>startGame</code> (and its signature)
+to only start the game if all players are valid</p>
+<p>{% initial src=&quot;./exercises/ch12/exercise_b.js#L7;&quot; %}  </p>
+<pre><code class="lang-js"><span class="hljs-comment">// startGame :: [Player] -&gt; [Either Error String]</span>
+<span class="hljs-keyword">const</span> startGame = compose(<span class="hljs-built_in">map</span>(<span class="hljs-built_in">map</span>(always(<span class="hljs-string">'game started!'</span>))), <span class="hljs-built_in">map</span>(validate));
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch12/solution_b.js&quot; %}<br>{% validation src=&quot;./exercises/ch12/validation_b.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
+<hr>
+<p>Finally, we consider some file-system helpers:</p>
+<pre><code class="lang-js">// readfile <span class="hljs-type">::</span> <span class="hljs-built_in">String</span> -&gt; <span class="hljs-built_in">String</span> -&gt; <span class="hljs-built_in">Task</span> Error <span class="hljs-built_in">String</span>
+// readdir <span class="hljs-type">::</span> <span class="hljs-built_in">String</span> -&gt; <span class="hljs-built_in">Task</span> Error [<span class="hljs-built_in">String</span>]
+</code></pre>
+<p>{% exercise %}<br>Use traversable to rearrange and flatten the nested Tasks &amp; Maybe</p>
+<p>{% initial src=&quot;./exercises/ch12/exercise_c.js#L8;&quot; %}  </p>
+<pre><code class="lang-js">// readFirst :: <span class="hljs-built_in">String</span> -&gt; Task <span class="hljs-literal">Error</span> (Maybe (Task <span class="hljs-literal">Error</span> <span class="hljs-built_in">String</span>))
+const readFirst = compose(<span class="hljs-keyword">map</span>(<span class="hljs-keyword">map</span>(readfile(<span class="hljs-symbol">'utf</span>-<span class="hljs-number">8</span>'))), <span class="hljs-keyword">map</span>(safeHead), readdir);
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch12/solution_c.js&quot; %}<br>{% validation src=&quot;./exercises/ch12/validation_c.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
