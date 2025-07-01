@@ -1,0 +1,98 @@
+<h2 id="faq">FAQ</h2>
+<ul>
+<li><a href="#why-are-snippets-written-sometimes-with-semicolons-and-sometimes-without">Why are snippets written sometimes with semicolons and sometimes
+without?</a></li>
+<li><a href="#arent-external-libraries-like-_-ramda-or--jquery-making-calls-impure">Aren&#39;t external libraries like _ (ramda) or $ (jquery) making calls impure?</a></li>
+<li><a href="#what-is-the-meaning-of-f-a-in-signature">What is the meaning of <code>f a</code> in signature?</a></li>
+<li><a href="#is-there-any-real-world-examples-available">Is there any &quot;real world&quot; examples available?</a></li>
+<li><a href="#why-does-the-book-uses-es5-is-any-es6-version-available">Why does the book uses ES5? Is any ES6 version available?</a></li>
+<li><a href="#what-the-heck-is-that-reduce-function-about">What the heck is that reduce function about?</a></li>
+<li><a href="#wouldnt-you-use-a-simplified-english-rather-than-the-current-style">Wouldn&#39;t you use a simplified English rather than the current style?</a></li>
+<li><a href="#what-is-either-what-is-future-what-is-task">What is Either? What is Future? What is Task?</a></li>
+<li><a href="#where-do-map-filter-compose--methods-come-from">Where do map, filter, compose ... methods come from?</a></li>
+</ul>
+<h3 id="why-are-snippets-written-sometimes-with-semicolons-and-sometimes-without-">Why are snippets written sometimes with semicolons and sometimes without?</h3>
+<blockquote>
+<p>see <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/issues/6">#6</a></p>
+</blockquote>
+<p>There are two schools in JavaScript, people who use them, and people who don&#39;t.  We&#39;ve made the
+choice here to use them, and now, we strive to be consistent with that choice. If some are
+missing, please let us know and we will take care of the oversight.</p>
+<h3 id="aren-t-external-libraries-like-_-ramda-or-jquery-making-calls-impure-">Aren&#39;t external libraries like _ (ramda) or $ (jquery) making calls impure?</h3>
+<blockquote>
+<p>see <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/issues/50">#50</a></p>
+</blockquote>
+<p>Those dependencies are available as if they were in the global context, part of the language.
+So, no, calls can still be considered as pure.
+For further reading, have a look at <a href="http://tomasp.net/blog/2014/why-coeffects-matter/">this article about
+CoEffects</a></p>
+<h3 id="what-is-the-meaning-of-f-a-in-signature-">What is the meaning of <code>f a</code> in signature?</h3>
+<blockquote>
+<p>see <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/issues/62">#62</a></p>
+</blockquote>
+<p>In a signature, like:</p>
+<p><code>map :: Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b</code></p>
+<p><code>f</code> refers to a <code>functor</code> that could be, for instance, Maybe or IO. Thus, the signature abstracts
+the choice of that functor by using a type variable which basically means that any functor
+might be used where <code>f</code> stands as long as all <code>f</code> are of the same type (if the first <code>f a</code> in
+the signature represents a <code>Maybe a</code>, then the second one <strong>cannot refer to</strong> an <code>IO b</code> but
+should be a <code>Maybe b</code>. For instance:</p>
+<pre><code class="lang-javascript"><span class="hljs-keyword">let</span> maybeString = Maybe.of(<span class="hljs-string">"Patate"</span>)
+<span class="hljs-keyword">let</span> <span class="hljs-keyword">f</span> = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(x)</span> { <span class="hljs-title">return</span> <span class="hljs-title">x</span>.<span class="hljs-title">length</span> }</span>
+<span class="hljs-keyword">let</span> maybeNumber = <span class="hljs-keyword">map</span>(<span class="hljs-keyword">f</span>, maybeString) // Maybe(<span class="hljs-number">6</span>)
+
+// With the following <span class="hljs-string">'refined'</span> signature:
+// <span class="hljs-keyword">map</span> :: (<span class="hljs-built_in">string</span> -&gt; <span class="hljs-keyword">number</span>) -&gt; Maybe <span class="hljs-built_in">string</span> -&gt; Maybe <span class="hljs-keyword">number</span>
+</code></pre>
+<h3 id="is-there-any-real-world-examples-available-">Is there any &quot;real world&quot; examples available?</h3>
+<blockquote>
+<p>see <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/issues/77">#77</a>, <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/issues/192">#192</a></p>
+</blockquote>
+<p>Should you haven&#39;t reached it yet, you may have a look at the <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/blob/master/ch06.md">Chapter
+6</a> which presents a
+simple flickr application.
+Other examples are likely to come later on. By the way, feel free to share with us your
+experience!</p>
+<h3 id="why-does-the-book-uses-es5-is-any-es6-version-available-">Why does the book uses ES5? Is any ES6 version available?</h3>
+<blockquote>
+<p>see <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/issues/83">#83</a>, <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/pull/235">#235</a></p>
+</blockquote>
+<p>The book aims at being widely accessible. It started before ES6 went out, and now, as the new
+standard is being more and more accepted, we are considering making two separated editions with
+ES5 and ES6. Members of the community are already working on the ES6 version (have a look to
+<a href="https://github.com/MostlyAdequate/mostly-adequate-guide/pull/235">#235</a> for more information).</p>
+<h3 id="what-the-heck-is-that-reduce-function-about-">What the heck is that reduce function about?</h3>
+<blockquote>
+<p>see <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/issues/109">#109</a></p>
+</blockquote>
+<p>Reduce, accumulate, fold, inject are all usual functions in functional programming used to
+combine the elements of a data structure successively. You might have a look at <a href="https://www.youtube.com/watch?v=JZSoPZUoR58&amp;ab_channel=NewCircleTraining">this
+talk</a> to get some
+more insights about the reduce function.</p>
+<h3 id="wouldn-t-you-use-a-simplified-english-rather-than-the-current-style-">Wouldn&#39;t you use a simplified English rather than the current style?</h3>
+<blockquote>
+<p>see <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/issues/176">#176</a></p>
+</blockquote>
+<p>The book is written in its own style which contributes to make it consistent as a whole. If
+you&#39;re not familiar with English, see it as good training. Nevertheless, should you need help
+to understand the meaning sometimes, there are now <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/blob/master/TRANSLATIONS.md">several
+translations</a>
+available that could probably help you.</p>
+<h3 id="what-is-either-what-is-future-what-is-task-">What is Either? What is Future? What is Task?</h3>
+<blockquote>
+<p>see <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/issues/194">#194</a></p>
+</blockquote>
+<p>We introduce all of those structures throughout the book. Therefore, you won&#39;t find any use of a
+structure that hasn&#39;t previously be defined. Do not hesitate to read again some old parts if
+you ever feel uncomfortable with those types.
+A glossary/vade mecum will come at the end to synthesize all these notions.</p>
+<h3 id="where-do-map-filter-compose-methods-come-from-">Where do map, filter, compose ... methods come from?</h3>
+<blockquote>
+<p>see <a href="https://github.com/MostlyAdequate/mostly-adequate-guide/issues/198">#198</a></p>
+</blockquote>
+<p>Most of the time, those methods are defined in specific vendor libraries such as <code>ramda</code> or
+<code>underscore</code>. You should also have a look at <a href="./appendix_a.md">Appendix A</a>, 
+<a href="./appendix_b.md">Appendix B</a> and <a href="./appendix_c.md">Appendix C</a> in which we define
+several implementations used for the exercises. Those functions are really
+common in functional programming and even though their implementations may vary a bit, their
+meanings remain fairly consistent between libraries.</p>
