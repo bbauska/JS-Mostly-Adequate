@@ -1,0 +1,206 @@
+<h1 id="chapter-03-pure-happiness-with-pure-functions">Chapter 03: Pure Happiness with Pure Functions</h1>
+
+<h2 id="oh-to-be-pure-again">Oh to Be Pure Again</h2>
+
+<p>One thing we need to get straight is the idea of a pure function.</p>
+
+<blockquote>
+<p>A pure function is a function that, given the same input, will always return the same 
+output and does not have any observable side effect.</p>
+</blockquote>
+
+<p>Take <code>slice</code> and <code>splice</code>. They are two functions that do the 
+exact same thing - in a vastly different way, mind you, but the same thing nonetheless. 
+We say <code>slice</code> is <em>pure</em> because it returns the same output per input 
+every time, guaranteed. <code>splice</code>, however, will chew up its array and spit 
+it back out forever changed which is an observable effect.</p>
+
+<pre><code class="lang-js">const xs = [<span class="hljs-number">1</span>,<span class="hljs-number">2</span>,<span class="hljs-number">3</span>,<span class="hljs-number">4</span>,<span class="hljs-number">5</span>];
+
+<span class="hljs-comment">// pure</span>
+xs.slice(<span class="hljs-number">0</span>,<span class="hljs-number">3</span>); <span class="hljs-comment">// [1,2,3]</span>
+
+xs.slice(<span class="hljs-number">0</span>,<span class="hljs-number">3</span>); <span class="hljs-comment">// [1,2,3]</span>
+
+xs.slice(<span class="hljs-number">0</span>,<span class="hljs-number">3</span>); <span class="hljs-comment">// [1,2,3]</span>
+
+
+<span class="hljs-comment">// impure</span>
+xs.splice(<span class="hljs-number">0</span>,<span class="hljs-number">3</span>); <span class="hljs-comment">// [1,2,3]</span>
+
+xs.splice(<span class="hljs-number">0</span>,<span class="hljs-number">3</span>); <span class="hljs-comment">// [4,5]</span>
+
+xs.splice(<span class="hljs-number">0</span>,<span class="hljs-number">3</span>); <span class="hljs-comment">// []</span>
+</code></pre>
+
+<p>In functional programming, we dislike unwieldy functions like <code>splice</code> that 
+<em>mutate</em> data. This will never do as we&#39;re striving for reliable functions that 
+return the same result every time, not functions that leave a mess in their wake like 
+<code>splice</code>.</p>
+
+<p>Let&#39;s look at another example.</p>
+
+<pre><code class="lang-js"><span class="hljs-comment">// impure</span>
+<span class="hljs-keyword">let</span> minimum = <span class="hljs-number">21</span>;
+<span class="hljs-keyword">const</span> checkAge = <span class="hljs-function"><span class="hljs-params">age</span> =&gt;</span> age &gt;= minimum;
+
+<span class="hljs-comment">// pure</span>
+<span class="hljs-keyword">const</span> checkAge = <span class="hljs-function">(<span class="hljs-params">age</span>) =&gt;</span> {
+  <span class="hljs-keyword">const</span> minimum = <span class="hljs-number">21</span>;
+  <span class="hljs-keyword">return</span> age &gt;= minimum;
+};
+</code></pre>
+
+<p>In the impure portion, <code>checkAge</code> depends on the mutable variable <code>minimum</code> to determine the result. In other words, it depends on system state which is disappointing because it increases the <a href="https://en.wikipedia.org/wiki/Cognitive_load">cognitive load</a> by introducing an external environment.</p>
+<p>It might not seem like a lot in this example, but this reliance upon state is one of the largest contributors to system complexity (<a href="http://curtclifton.net/papers/MoseleyMarks06a.pdf">http://curtclifton.net/papers/MoseleyMarks06a.pdf</a>). This <code>checkAge</code> may return different results depending on factors external to input, which not only disqualifies it from being pure, but also puts our minds through the wringer each time we&#39;re reasoning about the software.</p>
+<p>Its pure form, on the other hand, is completely self sufficient. We can  also make <code>minimum</code> immutable, which preserves the purity as the state will never change. To do this, we must create an object to freeze.</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> immutableState = <span class="hljs-built_in">Object</span>.freeze({ minimum: <span class="hljs-number">21</span> });
+</code></pre>
+<h2 id="side-effects-may-include-">Side Effects May Include...</h2>
+<p>Let&#39;s look more at these &quot;side effects&quot; to improve our intuition. So what is this undoubtedly nefarious <em>side effect</em> mentioned in the definition of <em>pure function</em>? We&#39;ll be referring to <em>effect</em> as anything that occurs in our computation other than the calculation of a result.</p>
+<p>There&#39;s nothing intrinsically bad about effects and we&#39;ll be using them all over the place in the chapters to come. It&#39;s that <em>side</em> part that bears the negative connotation. Water alone is not an inherent larvae incubator, it&#39;s the <em>stagnant</em> part that yields the swarms, and I assure you, <em>side</em> effects are a similar breeding ground in your own programs.</p>
+<blockquote>
+<p>A <em>side effect</em> is a change of system state or <em>observable interaction</em> with the outside world that occurs during the calculation of a result.</p>
+</blockquote>
+<p>Side effects may include, but are not limited to</p>
+<ul>
+<li>changing the file system</li>
+<li>inserting a record into a database</li>
+<li>making an http call</li>
+<li>mutations</li>
+<li>printing to the screen / logging</li>
+<li>obtaining user input</li>
+<li>querying the DOM</li>
+<li>accessing system state</li>
+</ul>
+<p>And the list goes on and on. Any interaction with the world outside of a function is a side effect, which is a fact that may prompt you to suspect the practicality of programming without them. The philosophy of functional programming postulates that side effects are a primary cause of incorrect behavior.</p>
+<p>It is not that we&#39;re forbidden to use them, rather we want to contain them and run them in a controlled way. We&#39;ll learn how to do this when we get to functors and monads in later chapters, but for now, let&#39;s try to keep these insidious functions separate from our pure ones.</p>
+<p>Side effects disqualify a function from being <em>pure</em>. And it makes sense: pure functions, by definition, must always return the same output given the same input, which is not possible to guarantee when dealing with matters outside our local function.</p>
+<p>Let&#39;s take a closer look at why we insist on the same output per input. Pop your collars, we&#39;re going to look at some 8th grade math.</p>
+<h2 id="8th-grade-math">8th Grade Math</h2>
+<p>From mathisfun.com:</p>
+<blockquote>
+<p>A function is a special relationship between values:
+Each of its input values gives back exactly one output value.</p>
+</blockquote>
+<p>In other words, it&#39;s just a relation between two values: the input and the output. Though each input has exactly one output, that output doesn&#39;t necessarily have to be unique per input. Below shows a diagram of a perfectly valid function from <code>x</code> to <code>y</code>;</p>
+<p><img src="images/function-sets.gif" alt="function sets" />(<a href="https://www.mathsisfun.com/sets/function.html">https://www.mathsisfun.com/sets/function.html</a>)</p>
+<p>To contrast, the following diagram shows a relation that is <em>not</em> a function since the input value <code>5</code> points to several outputs:</p>
+<p><img src="images/relation-not-function.gif" alt="relation not function" />(<a href="https://www.mathsisfun.com/sets/function.html">https://www.mathsisfun.com/sets/function.html</a>)</p>
+<p>Functions can be described as a set of pairs with the position (input, output): <code>[(1,2), (3,6), (5,10)]</code> (It appears this function doubles its input).</p>
+<p>Or perhaps a table:</p>
+<table> <tr> <th>Input</th> <th>Output</th> </tr> <tr> <td>1</td> <td>2</td> </tr> <tr> <td>2</td> <td>4</td> </tr> <tr> <td>3</td> <td>6</td> </tr> </table>
+
+<p>Or even as a graph with <code>x</code> as the input and <code>y</code> as the output:</p>
+<p><img src="images/fn_graph.png" width="300" height="300" alt="function graph" /></p>
+<p>There&#39;s no need for implementation details if the input dictates the output. Since functions are simply mappings of input to output, one could simply jot down object literals and run them with <code>[]</code> instead of <code>()</code>.</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> toLowerCase = {
+  A: <span class="hljs-string">'a'</span>,
+  B: <span class="hljs-string">'b'</span>,
+  C: <span class="hljs-string">'c'</span>,
+  D: <span class="hljs-string">'d'</span>,
+  E: <span class="hljs-string">'e'</span>,
+  F: <span class="hljs-string">'f'</span>,
+};
+toLowerCase[<span class="hljs-string">'C'</span>]; <span class="hljs-comment">// 'c'</span>
+
+<span class="hljs-keyword">const</span> isPrime = {
+  <span class="hljs-number">1</span>: <span class="hljs-literal">false</span>,
+  <span class="hljs-number">2</span>: <span class="hljs-literal">true</span>,
+  <span class="hljs-number">3</span>: <span class="hljs-literal">true</span>,
+  <span class="hljs-number">4</span>: <span class="hljs-literal">false</span>,
+  <span class="hljs-number">5</span>: <span class="hljs-literal">true</span>,
+  <span class="hljs-number">6</span>: <span class="hljs-literal">false</span>,
+};
+isPrime[<span class="hljs-number">3</span>]; <span class="hljs-comment">// true</span>
+</code></pre>
+<p>Of course, you might want to calculate instead of hand writing things out, but this illustrates a different way to think about functions. (You may be thinking &quot;what about functions with multiple arguments?&quot;. Indeed, that presents a bit of an inconvenience when thinking in terms of mathematics. For now, we can bundle them up in an array or just think of the <code>arguments</code> object as the input. When we learn about <em>currying</em>, we&#39;ll see how we can directly model the mathematical definition of a function.)</p>
+<p>Here comes the dramatic reveal: Pure functions <em>are</em> mathematical functions and they&#39;re what functional programming is all about. Programming with these little angels can provide huge benefits. Let&#39;s look at some reasons why we&#39;re willing to go to great lengths to preserve purity.</p>
+<h2 id="the-case-for-purity">The Case for Purity</h2>
+<h3 id="cacheable">Cacheable</h3>
+<p>For starters, pure functions can always be cached by input. This is typically done using a technique called memoization:</p>
+<pre><code class="lang-js">const squareNumber = memoize(x =&gt; x * x);
+
+squareNumber(<span class="hljs-number">4</span>); <span class="hljs-comment">// 16</span>
+
+squareNumber(<span class="hljs-number">4</span>); <span class="hljs-comment">// 16, returns cache for input 4</span>
+
+squareNumber(<span class="hljs-number">5</span>); <span class="hljs-comment">// 25</span>
+
+squareNumber(<span class="hljs-number">5</span>); <span class="hljs-comment">// 25, returns cache for input 5</span>
+</code></pre>
+<p>Here is a simplified implementation, though there are plenty of more robust versions available.</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> memoize = <span class="hljs-function">(<span class="hljs-params">f</span>) =&gt;</span> {
+  <span class="hljs-keyword">const</span> cache = {};
+
+  <span class="hljs-keyword">return</span> <span class="hljs-function">(<span class="hljs-params">...args</span>) =&gt;</span> {
+    <span class="hljs-keyword">const</span> argStr = <span class="hljs-built_in">JSON</span>.stringify(args);
+    cache[argStr] = cache[argStr] || f(...args);
+    <span class="hljs-keyword">return</span> cache[argStr];
+  };
+};
+</code></pre>
+<p>Something to note is that you can transform some impure functions into pure ones by delaying evaluation:</p>
+<pre><code class="lang-js">const pureHttpCall = memoize((<span class="hljs-name">url</span>, params) =&gt; () =&gt; $.getJSON(<span class="hljs-name">url</span>, params))<span class="hljs-comment">;</span>
+</code></pre>
+<p>The interesting thing here is that we don&#39;t actually make the http call - we instead return a function that will do so when called. This function is pure because it will always return the same output given the same input: the function that will make the particular http call given the <code>url</code> and <code>params</code>.</p>
+<p>Our <code>memoize</code> function works just fine, though it doesn&#39;t cache the results of the http call, rather it caches the generated function.</p>
+<p>This is not very useful yet, but we&#39;ll soon learn some tricks that will make it so. The takeaway is that we can cache every function no matter how destructive they seem.</p>
+<h3 id="portable-self-documenting">Portable / Self-documenting</h3>
+<p>Pure functions are completely self contained. Everything the function needs is handed to it on a silver platter. Ponder this for a moment... How might this be beneficial? For starters, a function&#39;s dependencies are explicit and therefore easier to see and understand - no funny business going on under the hood.</p>
+<pre><code class="lang-js"><span class="hljs-comment">// impure</span>
+<span class="hljs-keyword">const</span> signUp = <span class="hljs-function">(<span class="hljs-params">attrs</span>) =&gt;</span> {
+  <span class="hljs-keyword">const</span> user = saveUser(attrs);
+  welcomeUser(user);
+};
+
+<span class="hljs-comment">// pure</span>
+<span class="hljs-keyword">const</span> signUp = <span class="hljs-function">(<span class="hljs-params">Db, Email, attrs</span>) =&gt;</span> () =&gt; {
+  <span class="hljs-keyword">const</span> user = saveUser(Db, attrs);
+  welcomeUser(Email, user);
+};
+</code></pre>
+<p>The example here demonstrates that the pure function must be honest about its dependencies and, as such, tell us exactly what it&#39;s up to. Just from its signature, we know that it will use a <code>Db</code>, <code>Email</code>, and <code>attrs</code> which should be telling to say the least.</p>
+<p>We&#39;ll learn how to make functions like this pure without merely deferring evaluation, but the point should be clear that the pure form is much more informative than its sneaky impure counterpart which is up to who knows what.</p>
+<p>Something else to notice is that we&#39;re forced to &quot;inject&quot; dependencies, or pass them in as arguments, which makes our app much more flexible because we&#39;ve parameterized our database or mail client or what have you (don&#39;t worry, we&#39;ll see a way to make this less tedious than it sounds). Should we choose to use a different Db we need only to call our function with it. Should we find ourselves writing a new application in which we&#39;d like to reuse this reliable function, we simply give this function whatever <code>Db</code> and <code>Email</code> we have at the time.</p>
+<p>In a JavaScript setting, portability could mean serializing and sending functions over a socket. It could mean running all our app code in web workers. Portability is a powerful trait.</p>
+<p>Contrary to &quot;typical&quot; methods and procedures in imperative programming rooted deep in their environment via state, dependencies, and available effects, pure functions can be run anywhere our hearts desire.</p>
+<p>When was the last time you copied a method into a new app? One of my favorite quotes comes from Erlang creator, Joe Armstrong: &quot;The problem with object-oriented languages is they’ve got all this implicit environment that they carry around with them. You wanted a banana but what you got was a gorilla holding the banana... and the entire jungle&quot;.</p>
+<h3 id="testable">Testable</h3>
+<p>Next, we come to realize pure functions make testing much easier. We don&#39;t have to mock a &quot;real&quot; payment gateway or setup and assert the state of the world after each test. We simply give the function input and assert output.</p>
+<p>In fact, we find the functional community pioneering new test tools that can blast our functions with generated input and assert that properties hold on the output. It&#39;s beyond the scope of this book, but I strongly encourage you to search for and try <em>Quickcheck</em> - a testing tool that is tailored for a purely functional environment.</p>
+<h3 id="reasonable">Reasonable</h3>
+<p>Many believe the biggest win when working with pure functions is <em>referential transparency</em>. A spot of code is referentially transparent when it can be substituted for its evaluated value without changing the behavior of the program.</p>
+<p>Since pure functions don&#39;t have side effects, they can only influence the behavior of a program through their output values. Furthermore, since their output values can reliably be calculated using only their input values, pure functions will always preserve referential transparency. Let&#39;s see an example.</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> { <span class="hljs-built_in">Map</span> } = require(<span class="hljs-string">'immutable'</span>);
+
+<span class="hljs-comment">// Aliases: p = player, a = attacker, t = target</span>
+<span class="hljs-keyword">const</span> jobe = <span class="hljs-built_in">Map</span>({ name: <span class="hljs-string">'Jobe'</span>, hp: <span class="hljs-number">20</span>, team: <span class="hljs-string">'red'</span> });
+<span class="hljs-keyword">const</span> michael = <span class="hljs-built_in">Map</span>({ name: <span class="hljs-string">'Michael'</span>, hp: <span class="hljs-number">20</span>, team: <span class="hljs-string">'green'</span> });
+<span class="hljs-keyword">const</span> decrementHP = p =&gt; p.<span class="hljs-keyword">set</span>(<span class="hljs-string">'hp'</span>, p.<span class="hljs-keyword">get</span>(<span class="hljs-string">'hp'</span>) - <span class="hljs-number">1</span>);
+<span class="hljs-keyword">const</span> isSameTeam = (p1, p2) =&gt; p1.<span class="hljs-keyword">get</span>(<span class="hljs-string">'team'</span>) === p2.<span class="hljs-keyword">get</span>(<span class="hljs-string">'team'</span>);
+<span class="hljs-keyword">const</span> punch = (a, t) =&gt; (isSameTeam(a, t) ? t : decrementHP(t));
+
+punch(jobe, michael); <span class="hljs-comment">// Map({name:'Michael', hp:19, team: 'green'})</span>
+</code></pre>
+<p><code>decrementHP</code>, <code>isSameTeam</code> and <code>punch</code> are all pure and therefore referentially transparent. We can use a technique called <em>equational reasoning</em> wherein one substitutes &quot;equals for equals&quot; to reason about code. It&#39;s a bit like manually evaluating the code without taking into account the quirks of programmatic evaluation. Using referential transparency, let&#39;s play with this code a bit.</p>
+<p>First we&#39;ll inline the function <code>isSameTeam</code>.</p>
+<pre><code class="lang-js">const punch = (<span class="hljs-name">a</span>, <span class="hljs-literal">t</span>) =&gt; (<span class="hljs-name">a</span>.get('team') === <span class="hljs-literal">t</span>.get('team') ? <span class="hljs-literal">t</span> : decrementHP(<span class="hljs-name">t</span>))<span class="hljs-comment">;</span>
+</code></pre>
+<p>Since our data is immutable, we can simply replace the teams with their actual value</p>
+<pre><code class="lang-js">const punch = (<span class="hljs-name">a</span>, <span class="hljs-literal">t</span>) =&gt; ('red' === 'green' ? <span class="hljs-literal">t</span> : decrementHP(<span class="hljs-name">t</span>))<span class="hljs-comment">;</span>
+</code></pre>
+<p>We see that it is false in this case so we can remove the entire if branch</p>
+<pre><code class="lang-js">const punch = (<span class="hljs-name">a</span>, <span class="hljs-literal">t</span>) =&gt; decrementHP(<span class="hljs-name">t</span>)<span class="hljs-comment">;</span>
+</code></pre>
+<p>And if we inline <code>decrementHP</code>, we see that, in this case, punch becomes a call to decrement the <code>hp</code> by 1.</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> punch = (a, t) =&gt; t.<span class="hljs-keyword">set</span>(<span class="hljs-string">'hp'</span>, t.<span class="hljs-keyword">get</span>(<span class="hljs-string">'hp'</span>) - <span class="hljs-number">1</span>);
+</code></pre>
+<p>This ability to reason about code is terrific for refactoring and understanding code in general. In fact, we used this technique to refactor our flock of seagulls program. We used equational reasoning to harness the properties of addition and multiplication. Indeed, we&#39;ll be using these techniques throughout the book.</p>
+<h3 id="parallel-code">Parallel Code</h3>
+<p>Finally, and here&#39;s the coup de grâce, we can run any pure function in parallel since it does not need access to shared memory and it cannot, by definition, have a race condition due to some side effect.</p>
+<p>This is very much possible in a server side js environment with threads as well as in the browser with web workers though current culture seems to avoid it due to complexity when dealing with impure functions.</p>
+<h2 id="in-summary">In Summary</h2>
+<p>We&#39;ve seen what pure functions are and why we, as functional programmers, believe they are the cat&#39;s evening wear. From this point on, we&#39;ll strive to write all our functions in a pure way. We&#39;ll require some extra tools to help us do so, but in the meantime, we&#39;ll try to separate the impure functions from the rest of the pure code.</p>
+<p>Writing programs with pure functions is a tad laborious without some extra tools in our belt. We have to juggle data by passing arguments all over the place, we&#39;re forbidden to use state, not to mention effects. How does one go about writing these masochistic programs? Let&#39;s acquire a new tool called curry.</p>
+<p><a href="ch04.md">Chapter 04: Currying</a></p>
