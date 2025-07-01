@@ -1,0 +1,161 @@
+<h1 id="chapter-11-transform-again-naturally">Chapter 11: Transform Again, Naturally</h1>
+<p>We are about to discuss <em>natural transformations</em> in the context of practical utility in every day code. It just so happens they are a pillar of category theory and absolutely indispensable when applying mathematics to reason about and refactor our code. As such, I believe it is my duty to inform you about the lamentable injustice you are about to witness undoubtedly due to my limited scope. Let&#39;s begin.</p>
+<h2 id="curse-this-nest">Curse This Nest</h2>
+<p>I&#39;d like to address the issue of nesting. Not the instinctive urge felt by soon to be parents wherein they tidy and rearrange with obsessive compulsion, but the...well actually, come to think of it, that isn&#39;t far from the mark as we&#39;ll see in the coming chapters... In any case, what I mean by <em>nesting</em> is to have two or more different types all huddled together around a value, cradling it like a newborn, as it were.</p>
+<pre><code class="lang-js">Right(Maybe(<span class="hljs-string">'b'</span>));
+
+<span class="hljs-built_in">IO</span>(<span class="hljs-built_in">Task</span>(<span class="hljs-built_in">IO</span>(<span class="hljs-number">1000</span>)));
+
+[Identity('bee thousand')];
+</code></pre>
+<p>Until now, we&#39;ve managed to evade this common scenario with carefully crafted examples, but in practice, as one codes, types tend to tangle themselves up like earbuds in an exorcism. If we don&#39;t meticulously keep our types organized as we go along, our code will read hairier than a beatnik in a cat café.</p>
+<h2 id="a-situational-comedy">A Situational Comedy</h2>
+<pre><code class="lang-js">// getValue <span class="hljs-type">::</span> Selector -&gt; <span class="hljs-built_in">Task</span> Error (Maybe <span class="hljs-built_in">String</span>)
+// postComment <span class="hljs-type">::</span> <span class="hljs-built_in">String</span> -&gt; <span class="hljs-built_in">Task</span> Error Comment
+// validate <span class="hljs-type">::</span> <span class="hljs-built_in">String</span> -&gt; Either ValidationError <span class="hljs-built_in">String</span>
+
+// saveComment <span class="hljs-type">::</span> () -&gt; <span class="hljs-built_in">Task</span> Error (Maybe (Either ValidationError (<span class="hljs-built_in">Task</span> Error Comment)))
+<span class="hljs-keyword">const</span> saveComment = compose(
+  map(map(map(postComment))),
+  map(map(validate)),
+  getValue('<span class="hljs-comment">#comment'),</span>
+);
+</code></pre>
+<p>The gang is all here, much to our type signature&#39;s dismay. Allow me to briefly explain the code. We start by getting the user input with <code>getValue(&#39;#comment&#39;)</code> which is an action which retrieves text on an element. Now, it might error finding the element or the value string may not exist so it returns <code>Task Error (Maybe String)</code>. After that, we must <code>map</code> over both the <code>Task</code> and the <code>Maybe</code> to pass our text to <code>validate</code>, which in turn, gives us back <code>Either</code> a <code>ValidationError</code> or our <code>String</code>. Then onto mapping for days to send the <code>String</code> in our current <code>Task Error (Maybe (Either ValidationError String))</code> into <code>postComment</code> which returns our resulting <code>Task</code>.</p>
+<p>What a frightful mess. A collage of abstract types, amateur type expressionism, polymorphic Pollock, monolithic Mondrian. There are many solutions to this common issue. We can compose the types into one monstrous container, sort and <code>join</code> a few, homogenize them, deconstruct them, and so on. In this chapter, we&#39;ll focus on homogenizing them via <em>natural transformations</em>.</p>
+<h2 id="all-natural">All Natural</h2>
+<p>A <em>Natural Transformation</em> is a &quot;morphism between functors&quot;, that is, a function which operates on the containers themselves. Typewise, it is a function <code>(Functor f, Functor g) =&gt; f a -&gt; g a</code>. What makes it special is that we cannot, for any reason, peek at the contents of our functor. Think of it as an exchange of highly classified information - the two parties oblivious to what&#39;s in the sealed manila envelope stamped &quot;top secret&quot;. This is a structural operation. A functorial costume change. Formally, a <em>natural transformation</em> is any function for which the following holds:</p>
+<p><img width=600 src="images/natural_transformation.png" alt="natural transformation diagram" /></p>
+<p>or in code:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// nt :: (Functor f, Functor g) =&gt; f a -&gt; g a</span>
+compose(<span class="hljs-built_in">map</span>(f), nt) === compose(nt, <span class="hljs-built_in">map</span>(f));
+</code></pre>
+<p>Both the diagram and the code say the same thing: We can run our natural transformation then <code>map</code> or <code>map</code> then run our natural transformation and get the same result. Incidentally, that follows from a <a href="ch07.md#free-as-in-theorem">free theorem</a> though natural transformations (and functors) are not limited to functions on types.</p>
+<h2 id="principled-type-conversions">Principled Type Conversions</h2>
+<p>As programmers we are familiar with type conversions. We transform types like <code>Strings</code> into <code>Booleans</code> and <code>Integers</code> into <code>Floats</code> (though JavaScript only has <code>Numbers</code>). The difference here is simply that we&#39;re working with algebraic containers and we have some theory at our disposal.</p>
+<p>Let&#39;s look at some of these as examples:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// idToMaybe :: Identity a -&gt; Maybe a</span>
+<span class="hljs-keyword">const</span> idToMaybe = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> Maybe.of(x.$value);
+
+<span class="hljs-comment">// idToIO :: Identity a -&gt; IO a</span>
+<span class="hljs-keyword">const</span> idToIO = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> IO.of(x.$value);
+
+<span class="hljs-comment">// eitherToTask :: Either a b -&gt; Task a b</span>
+<span class="hljs-keyword">const</span> eitherToTask = either(Task.rejected, Task.of);
+
+<span class="hljs-comment">// ioToTask :: IO a -&gt; Task () a</span>
+<span class="hljs-keyword">const</span> ioToTask = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> Task(<span class="hljs-function">(<span class="hljs-params">reject, resolve</span>) =&gt;</span> resolve(x.unsafePerform()));
+
+<span class="hljs-comment">// maybeToTask :: Maybe a -&gt; Task () a</span>
+<span class="hljs-keyword">const</span> maybeToTask = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> (x.isNothing ? Task.rejected() : Task.of(x.$value));
+
+<span class="hljs-comment">// arrayToMaybe :: [a] -&gt; Maybe a</span>
+<span class="hljs-keyword">const</span> arrayToMaybe = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> Maybe.of(x[<span class="hljs-number">0</span>]);
+</code></pre>
+<p>See the idea? We&#39;re just changing one functor to another. We are permitted to lose information along the way so long as the value we&#39;ll <code>map</code> doesn&#39;t get lost in the shape shift shuffle. That is the whole point: <code>map</code> must carry on, according to our definition, even after the transformation.</p>
+<p>One way to look at it is that we are transforming our effects. In that light, we can view <code>ioToTask</code> as converting synchronous to asynchronous or <code>arrayToMaybe</code> from nondeterminism to possible failure. Note that we cannot convert asynchronous to synchronous in JavaScript so we cannot write <code>taskToIO</code> - that would be a supernatural transformation.</p>
+<h2 id="feature-envy">Feature Envy</h2>
+<p>Suppose we&#39;d like to use some features from another type like <code>sortBy</code> on a <code>List</code>. <em>Natural transformations</em> provide a nice way to convert to the target type knowing our <code>map</code> will be sound.</p>
+<pre><code class="lang-js"><span class="hljs-comment">// arrayToList :: [a] -&gt; List a</span>
+<span class="hljs-keyword">const</span> arrayToList = List.of;
+
+<span class="hljs-keyword">const</span> doListyThings = compose(sortBy(h), <span class="hljs-built_in">filter</span>(g), arrayToList, <span class="hljs-built_in">map</span>(f));
+<span class="hljs-keyword">const</span> doListyThings_ = compose(sortBy(h), <span class="hljs-built_in">filter</span>(g), <span class="hljs-built_in">map</span>(f), arrayToList); <span class="hljs-comment">// law applied</span>
+</code></pre>
+<p>A wiggle of our nose, three taps of our wand, drop in <code>arrayToList</code>, and voilà! Our <code>[a]</code> is a <code>List a</code> and we can <code>sortBy</code> if we please.</p>
+<p>Also, it becomes easier to optimize / fuse operations by moving <code>map(f)</code> to the left of <em>natural transformation</em> as shown in <code>doListyThings_</code>.</p>
+<h2 id="isomorphic-javascript">Isomorphic JavaScript</h2>
+<p>When we can completely go back and forth without losing any information, that is considered an <em>isomorphism</em>. That&#39;s just a fancy word for &quot;holds the same data&quot;. We say that two types are <em>isomorphic</em> if we can provide the &quot;to&quot; and &quot;from&quot; <em>natural transformations</em> as proof:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// promiseToTask :: Promise a b -&gt; Task a b</span>
+<span class="hljs-keyword">const</span> promiseToTask = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> Task(<span class="hljs-function">(<span class="hljs-params">reject, resolve</span>) =&gt;</span> x.then(resolve).catch(reject));
+
+<span class="hljs-comment">// taskToPromise :: Task a b -&gt; Promise a b</span>
+<span class="hljs-keyword">const</span> taskToPromise = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Promise</span>(<span class="hljs-function">(<span class="hljs-params">resolve, reject</span>) =&gt;</span> x.fork(reject, resolve));
+
+<span class="hljs-keyword">const</span> x = <span class="hljs-built_in">Promise</span>.resolve(<span class="hljs-string">'ring'</span>);
+taskToPromise(promiseToTask(x)) === x;
+
+<span class="hljs-keyword">const</span> y = Task.of(<span class="hljs-string">'rabbit'</span>);
+promiseToTask(taskToPromise(y)) === y;
+</code></pre>
+<p>Q.E.D. <code>Promise</code> and <code>Task</code> are <em>isomorphic</em>. We can also write a <code>listToArray</code> to complement our <code>arrayToList</code> and show that they are too. As a counter example, <code>arrayToMaybe</code> is not an <em>isomorphism</em> since it loses information:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// maybeToArray :: Maybe a -&gt; [a]</span>
+<span class="hljs-keyword">const</span> maybeToArray = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> (x.isNothing ? [] : [x.$value]);
+
+<span class="hljs-comment">// arrayToMaybe :: [a] -&gt; Maybe a</span>
+<span class="hljs-keyword">const</span> arrayToMaybe = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> Maybe.of(x[<span class="hljs-number">0</span>]);
+
+<span class="hljs-keyword">const</span> x = [<span class="hljs-string">'elvis costello'</span>, <span class="hljs-string">'the attractions'</span>];
+
+<span class="hljs-comment">// not isomorphic</span>
+maybeToArray(arrayToMaybe(x)); <span class="hljs-comment">// ['elvis costello']</span>
+
+<span class="hljs-comment">// but is a natural transformation</span>
+compose(arrayToMaybe, map(replace(<span class="hljs-string">'elvis'</span>, <span class="hljs-string">'lou'</span>)))(x); <span class="hljs-comment">// Just('lou costello')</span>
+<span class="hljs-comment">// ==</span>
+compose(map(replace(<span class="hljs-string">'elvis'</span>, <span class="hljs-string">'lou'</span>)), arrayToMaybe)(x); <span class="hljs-comment">// Just('lou costello')</span>
+</code></pre>
+<p>They are indeed <em>natural transformations</em>, however, since <code>map</code> on either side yields the same result. I mention <em>isomorphisms</em> here, mid-chapter while we&#39;re on the subject, but don&#39;t let that fool you, they are an enormously powerful and pervasive concept. Anyways, let&#39;s move on.</p>
+<h2 id="a-broader-definition">A Broader Definition</h2>
+<p>These structural functions aren&#39;t limited to type conversions by any means.</p>
+<p>Here are a few different ones:</p>
+<pre><code class="lang-hs">reverse <span class="hljs-comment">:: [a] -&gt; [a]</span>
+
+join <span class="hljs-comment">:: (Monad m) =&gt; m (m a) -&gt; m a</span>
+
+head <span class="hljs-comment">:: [a] -&gt; a</span>
+
+<span class="hljs-keyword">of</span> <span class="hljs-comment">:: a -&gt; f a</span>
+</code></pre>
+<p>The natural transformation laws hold for these functions too. One thing that might trip you up is that <code>head :: [a] -&gt; a</code> can be viewed as <code>head :: [a] -&gt; Identity a</code>. We are free to insert <code>Identity</code> wherever we please whilst proving laws since we can, in turn, prove that <code>a</code> is isomorphic to <code>Identity a</code> (see, I told you <em>isomorphisms</em> were pervasive).</p>
+<h2 id="one-nesting-solution">One Nesting Solution</h2>
+<p>Back to our comedic type signature. We can sprinkle in some <em>natural transformations</em> throughout the calling code to coerce each varying type so they are uniform and, therefore, <code>join</code>able.</p>
+<pre><code class="lang-js">// getValue <span class="hljs-type">::</span> Selector -&gt; <span class="hljs-built_in">Task</span> Error (Maybe <span class="hljs-built_in">String</span>)
+// postComment <span class="hljs-type">::</span> <span class="hljs-built_in">String</span> -&gt; <span class="hljs-built_in">Task</span> Error Comment
+// validate <span class="hljs-type">::</span> <span class="hljs-built_in">String</span> -&gt; Either ValidationError <span class="hljs-built_in">String</span>
+
+// saveComment <span class="hljs-type">::</span> () -&gt; <span class="hljs-built_in">Task</span> Error Comment
+<span class="hljs-keyword">const</span> saveComment = compose(
+  chain(postComment),
+  chain(eitherToTask),
+  map(validate),
+  chain(maybeToTask),
+  getValue('<span class="hljs-comment">#comment'),</span>
+);
+</code></pre>
+<p>So what do we have here? We&#39;ve simply added <code>chain(maybeToTask)</code> and <code>chain(eitherToTask)</code>. Both have the same effect; they naturally transform the functor our <code>Task</code> is holding into another <code>Task</code> then <code>join</code> the two. Like pigeon spikes on a window ledge, we avoid nesting right at the source. As they say in the city of light, &quot;Mieux vaut prévenir que guérir&quot; - an ounce of prevention is worth a pound of cure.</p>
+<h2 id="in-summary">In Summary</h2>
+<p><em>Natural transformations</em> are functions on our functors themselves. They are an extremely important concept in category theory and will start to appear everywhere once more abstractions are adopted, but for now, we&#39;ve scoped them to a few concrete applications. As we saw, we can achieve different effects by converting types with the guarantee that our composition will hold. They can also help us with nested types, although they have the general effect of homogenizing our functors to the lowest common denominator, which in practice, is the functor with the most volatile effects (<code>Task</code> in most cases).</p>
+<p>This continual and tedious sorting of types is the price we pay for having materialized them - summoned them from the ether. Of course, implicit effects are much more insidious and so here we are fighting the good fight. We&#39;ll need a few more tools in our tackle before we can reel in the larger type amalgamations. Next up, we&#39;ll look at reordering our types with <em>Traversable</em>.</p>
+<p><a href="ch12.md">Chapter 12: Traversing the Stone</a></p>
+<h2 id="exercises">Exercises</h2>
+<p>{% exercise %}<br>Write a natural transformation that converts <code>Either b a</code> to <code>Maybe a</code></p>
+<p>{% initial src=&quot;./exercises/ch11/exercise_a.js#L3;&quot; %}  </p>
+<pre><code class="lang-js"><span class="hljs-comment">// eitherToMaybe :: Either b a -&gt; Maybe a  </span>
+<span class="hljs-keyword">const</span> eitherToMaybe = <span class="hljs-literal">undefined</span>;
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch11/solution_a.js&quot; %}<br>{% validation src=&quot;./exercises/ch11/validation_a.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
+<hr>
+<pre><code class="lang-js"><span class="hljs-comment">// eitherToTask :: Either a b -&gt; Task a b</span>
+<span class="hljs-keyword">const</span> eitherToTask = either(<span class="hljs-built_in">Task</span>.rejected, <span class="hljs-built_in">Task</span>.of);
+</code></pre>
+<p>{% exercise %}<br>Using <code>eitherToTask</code>, simplify <code>findNameById</code> to remove the nested <code>Either</code>.</p>
+<p>{% initial src=&quot;./exercises/ch11/exercise_b.js#L6;&quot; %}  </p>
+<pre><code class="lang-js"><span class="hljs-comment">// findNameById :: Number -&gt; Task Error (Either Error User)  </span>
+<span class="hljs-keyword">const</span> findNameById = compose(<span class="hljs-built_in">map</span>(<span class="hljs-built_in">map</span>(prop(<span class="hljs-string">'name'</span>))), findUserById);
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch11/solution_b.js&quot; %}<br>{% validation src=&quot;./exercises/ch11/validation_b.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
+<hr>
+<p>As a reminder, the following functions are available in the exercise&#39;s context:</p>
+<pre><code class="lang-hs">split :: <span class="hljs-built_in">String</span> -&gt; <span class="hljs-built_in">String</span> -&gt; [<span class="hljs-built_in">String</span>]
+intercalate :: <span class="hljs-built_in">String</span> -&gt; [<span class="hljs-built_in">String</span>] -&gt; <span class="hljs-built_in">String</span>
+</code></pre>
+<p>{% exercise %}<br>Write the isomorphisms between String and [Char].</p>
+<p>{% initial src=&quot;./exercises/ch11/exercise_c.js#L8;&quot; %}  </p>
+<pre><code class="lang-js">// strToList <span class="hljs-type">::</span> <span class="hljs-built_in">String</span> -&gt; [<span class="hljs-built_in">Char</span>]  
+<span class="hljs-keyword">const</span> strToList = undefined;  
+
+// listToStr <span class="hljs-type">::</span> [<span class="hljs-built_in">Char</span>] -&gt; <span class="hljs-built_in">String</span>  
+<span class="hljs-keyword">const</span> listToStr = undefined;
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch11/solution_c.js&quot; %}<br>{% validation src=&quot;./exercises/ch11/validation_c.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
