@@ -1,0 +1,153 @@
+<h1 id="js-mostly-adequate">JS-Mostly-Adequate</h1>
+<h2 id="javascript-mostly-adequate-guide-">JavaScript - Mostly Adequate guide.</h2>
+<h1 id="chapter-01-what-ever-are-we-doing-">Chapter 01: What Ever Are We Doing?</h1>
+<h2 id="introductions">Introductions</h2>
+<p>Hi there! I&#39;m Professor Franklin Frisby. Pleased to make your acquaintance. We&#39;ll be 
+spending some time together, as I&#39;m supposed to teach you a bit about functional 
+programming. But enough about me, what about you? I&#39;m hoping that you&#39;re at least a bit 
+familiar with the JavaScript language, have a teensy bit of Object-Oriented experience, 
+and fancy yourself a working class programmer. You don&#39;t need to have a PhD in 
+Entomology, you just need to know how to find and kill some bugs.</p>
+<p>I won&#39;t assume that you have any previous functional programming knowledge, because we 
+both know what happens when you assume. I will, however, expect you to have run into 
+some of the unfavorable situations that arise when working with mutable state, 
+unrestricted side effects, and unprincipled design. Now that we&#39;ve been properly 
+introduced, let&#39;s get on with it.</p>
+<p>The purpose of this chapter is to give you a feel for what we&#39;re after when we write 
+functional programs. In order to be able to understand the following chapters, we must 
+have some idea about what makes a program <em>functional</em>. Otherwise we&#39;ll find ourselves 
+scribbling aimlessly, avoiding objects at all costs - a clumsy endeavor indeed. We need 
+a clear bullseye to hurl our code at, some celestial compass for when the waters get 
+rough.</p>
+<p>Now, there are some general programming principles - various acronymic credos that guide 
+us through the dark tunnels of any application: DRY (don&#39;t repeat yourself), YAGNI (ya 
+ain&#39;t gonna need it), loose coupling high cohesion, the principle of least surprise, 
+single responsibility, and so on.</p>
+<p>I won&#39;t belabor you by listing each and every guideline I&#39;ve heard throughout the 
+years... The point of the matter is that they hold up in a functional setting, although 
+they&#39;re merely tangential to our ultimate goal. What I&#39;d like you to get a feel for now, 
+before we get any further, is our intention when we poke and prod at the keyboard; our 
+functional Xanadu.</p>
+<!--BREAK-->
+<h2 id="a-brief-encounter">A Brief Encounter</h2>
+<p>Let&#39;s start with a touch of insanity. Here is a seagull application. When flocks 
+conjoin they become a larger flock, and when they breed, they increase by the number 
+of seagulls with whom they&#39;re breeding. Now, this is not intended to be good 
+Object-Oriented code, mind you, it is here to highlight the perils of our modern, 
+assignment based approach. Behold:</p>
+<pre><code class="lang-js"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Flock</span> </span>{
+  <span class="hljs-keyword">constructor</span>(n) {
+    <span class="hljs-keyword">this</span>.seagulls = n;
+  }
+
+  conjoin(other) {
+    <span class="hljs-keyword">this</span>.seagulls += other.seagulls;
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+  }
+
+  breed(other) {
+    <span class="hljs-keyword">this</span>.seagulls = <span class="hljs-keyword">this</span>.seagulls * other.seagulls;
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+  }
+}
+
+<span class="hljs-keyword">const</span> flockA = <span class="hljs-keyword">new</span> Flock(<span class="hljs-number">4</span>);
+<span class="hljs-keyword">const</span> flockB = <span class="hljs-keyword">new</span> Flock(<span class="hljs-number">2</span>);
+<span class="hljs-keyword">const</span> flockC = <span class="hljs-keyword">new</span> Flock(<span class="hljs-number">0</span>);
+<span class="hljs-keyword">const</span> result = flockA
+  .conjoin(flockC)
+  .breed(flockB)
+  .conjoin(flockA.breed(flockB))
+  .seagulls;
+<span class="hljs-comment">// 32</span>
+</code></pre>
+<p>Who on earth would craft such a ghastly abomination? It is unreasonably difficult to 
+keep track of the mutating internal state. And, good heavens, the answer is even 
+incorrect! It should have been <code>16</code>, but <code>flockA</code> wound up permanently altered in the 
+process. Poor <code>flockA</code>. This is anarchy in the I.T.! This is wild animal arithmetic!
+If you don&#39;t understand this program, it&#39;s okay, neither do I. The point to remember 
+here is that state and mutable values are hard to follow, even in such a small example.</p>
+<p>Let&#39;s try again, this time using a more functional approach:</p>
+<pre><code class="lang-js">const conjoin = (<span class="hljs-name">flockX</span>, flockY) =&gt; flockX + flockY<span class="hljs-comment">;</span>
+const breed = (<span class="hljs-name">flockX</span>, flockY) =&gt; flockX * flockY<span class="hljs-comment">;</span>
+
+const flockA = <span class="hljs-number">4</span><span class="hljs-comment">;</span>
+const flockB = <span class="hljs-number">2</span><span class="hljs-comment">;</span>
+const flockC = <span class="hljs-number">0</span><span class="hljs-comment">;</span>
+const result =
+    conjoin(<span class="hljs-name">breed</span>(<span class="hljs-name">flockB</span>, conjoin(<span class="hljs-name">flockA</span>, flockC)), breed(<span class="hljs-name">flockA</span>, flockB))<span class="hljs-comment">;</span>
+// <span class="hljs-number">16</span>
+</code></pre>
+<p>Well, this time we got the right answer. With much less code. The function nesting is a 
+tad confusing... (we&#39;ll remedy this situation in ch5). It&#39;s better, but let&#39;s dig a 
+little bit deeper. There are benefits to calling a spade a spade. Had we scrutinized our 
+custom functions more closely, we would have discovered that we&#39;re just working with 
+simple addition (<code>conjoin</code>) and multiplication (<code>breed</code>).</p>
+<p>There&#39;s really nothing special at all about these two functions other than their names. 
+Let&#39;s rename our custom functions to <code>multiply</code> and <code>add</code> in order to reveal their true 
+identities.</p>
+<pre><code class="lang-js">const add = (<span class="hljs-name">x</span>, y) =&gt; x + y<span class="hljs-comment">;</span>
+const multiply = (<span class="hljs-name">x</span>, y) =&gt; x * y<span class="hljs-comment">;</span>
+
+const flockA = <span class="hljs-number">4</span><span class="hljs-comment">;</span>
+const flockB = <span class="hljs-number">2</span><span class="hljs-comment">;</span>
+const flockC = <span class="hljs-number">0</span><span class="hljs-comment">;</span>
+const result =
+    add(<span class="hljs-name">multiply</span>(<span class="hljs-name">flockB</span>, add(<span class="hljs-name">flockA</span>, flockC)), multiply(<span class="hljs-name">flockA</span>, flockB))<span class="hljs-comment">;</span>
+// <span class="hljs-number">16</span>
+</code></pre>
+<p>And with that, we gain the knowledge of the ancients:</p>
+<pre><code class="lang-js">// associative
+add(<span class="hljs-name">add</span>(<span class="hljs-name">x</span>, y), z) === add(<span class="hljs-name">x</span>, add(<span class="hljs-name">y</span>, z))<span class="hljs-comment">;</span>
+
+// commutative
+add(<span class="hljs-name">x</span>, y) === add(<span class="hljs-name">y</span>, x)<span class="hljs-comment">;</span>
+
+// identity
+add(<span class="hljs-name">x</span>, <span class="hljs-number">0</span>) === x<span class="hljs-comment">;</span>
+
+// distributive
+multiply(<span class="hljs-name">x</span>, add(<span class="hljs-name">y</span>,z)) === add(<span class="hljs-name">multiply</span>(<span class="hljs-name">x</span>, y), multiply(<span class="hljs-name">x</span>, z))<span class="hljs-comment">;</span>
+</code></pre>
+<p>Ah yes, those old faithful mathematical properties should come in handy. Don&#39;t worry if 
+you didn&#39;t know them right off the top of your head. For a lot of us, it&#39;s been a while 
+since we learned about these laws of arithmetic. Let&#39;s see if we can use these 
+properties to simplify our little seagull program.</p>
+<pre><code class="lang-js">// Original line
+add(<span class="hljs-name">multiply</span>(<span class="hljs-name">flockB</span>, add(<span class="hljs-name">flockA</span>, flockC)), multiply(<span class="hljs-name">flockA</span>, flockB))<span class="hljs-comment">;</span>
+
+// Apply the identity property to remove the extra add
+// (<span class="hljs-name">add</span>(<span class="hljs-name">flockA</span>, flockC) == flockA)
+add(<span class="hljs-name">multiply</span>(<span class="hljs-name">flockB</span>, flockA), multiply(<span class="hljs-name">flockA</span>, flockB))<span class="hljs-comment">;</span>
+
+// Apply distributive property to achieve our result
+multiply(<span class="hljs-name">flockB</span>, add(<span class="hljs-name">flockA</span>, flockA))<span class="hljs-comment">;</span>
+</code></pre>
+<p>Brilliant! We didn&#39;t have to write a lick of custom code other than our calling function. 
+We include <code>add</code> and <code>multiply</code> definitions here for completeness, but there is really no 
+need to write them - we surely have an <code>add</code> and <code>multiply</code> provided by some existing 
+library.</p>
+<p>You may be thinking &quot;how very strawman of you to put such a mathy example up front&quot;. Or 
+&quot;real programs are not this simple and cannot be reasoned about in such a way.&quot; I&#39;ve 
+chosen this example because most of us already know about addition and multiplication, 
+so it&#39;s easy to see how math is very useful for us here.</p>
+<p>Don&#39;t despair - throughout this book, we&#39;ll sprinkle in some category theory, set theory, 
+and lambda calculus and write real world examples that achieve the same elegant 
+simplicity and results as our flock of seagulls example. You needn&#39;t be a mathematician 
+either. It will feel natural and easy, just like you were using a &quot;normal&quot; framework or 
+API.</p>
+<p>It may come as a surprise to hear that we can write full, everyday applications along the 
+lines of the functional analog above. Programs that have sound properties. Programs that 
+are terse, yet easy to reason about. Programs that don&#39;t reinvent the wheel at every turn. 
+Lawlessness is good if you&#39;re a criminal, but in this book, we&#39;ll want to acknowledge and 
+obey the laws of math.</p>
+<p>We&#39;ll want to use a theory where every piece tends to fit together so politely. We&#39;ll want 
+to represent our specific problem in terms of generic, composable bits and then exploit 
+their properties for our own selfish benefit. It will take a bit more discipline than the 
+&quot;anything goes&quot; approach of imperative programming (we&#39;ll go over the precise definition 
+of &quot;imperative&quot; later in the book, but for now consider it anything other than functional 
+programming). The payoff of working within a principled, mathematical framework will truly 
+astound you.</p>
+<p>We&#39;ve seen a flicker of our functional northern star, but there are a few concrete 
+concepts to grasp before we can really begin our journey.</p>
+<p><a href="ch02.md">Chapter 02: First Class Functions</a></p>
