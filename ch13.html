@@ -1,0 +1,218 @@
+<h1 id="chapter-13-monoids-bring-it-all-together">Chapter 13: Monoids bring it all together</h1>
+<h2 id="wild-combination">Wild combination</h2>
+<p>In this chapter, we will examine <em>monoids</em> by way of <em>semigroup</em>. <em>Monoids</em> are the bubblegum in the hair of mathematical abstraction. They capture an idea that spans multiple disciplines, figuratively and literally bringing them all together. They are the ominous force that connects all that calculates. The oxygen in our code base, the ground on which it runs, quantum entanglement encoded.</p>
+<p><em>Monoids</em> are about combination. But what is combination? It can mean so many things from accumulation to concatenation to multiplication to choice, composition, ordering, even evaluation! We&#39;ll see many examples here, but we&#39;ll only tip-toe on the foothills of monoid mountain. The instances are plentiful and applications vast. The aim of this chapter is to provide a good intuition so you can make some <em>monoids</em> of your own.</p>
+<h2 id="abstracting-addition">Abstracting addition</h2>
+<p>Addition has some interesting qualities I&#39;d like to discuss. Let&#39;s have a look at it through our abstraction goggles.</p>
+<p>For starters, it&#39;s a binary operation, that is, an operation which takes two values and returns a value, all within the same set.</p>
+<pre><code class="lang-js"><span class="hljs-comment">// a binary operation</span>
+<span class="hljs-number">1</span> + <span class="hljs-number">1</span> = <span class="hljs-number">2</span>
+</code></pre>
+<p>See? Two values in the domain, one value in the codomain, all the same set - numbers, as it were. Some might say numbers are &quot;closed under addition&quot;, meaning the type won&#39;t ever change no matter which ones get tossed into the mix. That means we can chain the operation since the result is always another number:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// we can run this on any amount of numbers</span>
+<span class="hljs-number">1</span> + <span class="hljs-number">7</span> + <span class="hljs-number">5</span> + <span class="hljs-number">4</span> + ...
+</code></pre>
+<p>In addition to that (what a calculated pun...), we have associativity which buys us the ability to group operations however we please. Incidentally, an associative, binary operation is a recipe for parallel computation because we can chunk and distribute work.</p>
+<pre><code class="lang-js"><span class="hljs-comment">// associativity</span>
+(<span class="hljs-number">1</span> + <span class="hljs-number">2</span>) + <span class="hljs-number">3</span> = <span class="hljs-number">6</span>
+<span class="hljs-number">1</span> + (<span class="hljs-number">2</span> + <span class="hljs-number">3</span>) = <span class="hljs-number">6</span>
+</code></pre>
+<p>Now, don&#39;t go confusing this with commutativity which allows us to rearrange the order. While that holds for addition, we&#39;re not particularly interested in that property at the moment - too specific for our abstraction needs.</p>
+<p>Come to think of it, what properties should be in our abstract superclass anyways? What traits are specific to addition and what ones can be generalized? Are there other abstractions amidst this hierarchy or is it all one chunk? It&#39;s this kind of thinking that our mathematical forefathers applied when conceiving the interfaces in abstract algebra.</p>
+<p>As it happens, those old school abstractionists landed on the concept of a <em>group</em> when abstracting addition. A <em>group</em> has all the bells and whistles including the concept of negative numbers. Here, we&#39;re only interested in that associative binary operator so we&#39;ll choose the less specific interface <em>Semigroup</em>. A <em>Semigroup</em> is a type with a <code>concat</code> method which acts as our associative binary operator.</p>
+<p>Let&#39;s implement it for addition and call it <code>Sum</code>:</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> Sum = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> ({
+  x,
+  <span class="hljs-attr">concat</span>: <span class="hljs-function"><span class="hljs-params">other</span> =&gt;</span> Sum(x + other.x)
+})
+</code></pre>
+<p>Note we <code>concat</code> with some other <code>Sum</code> and always return a <code>Sum</code>.</p>
+<p>I&#39;ve used an object factory here instead of our typical prototype ceremony, primarily because <code>Sum</code> is not <em>pointed</em> and we don&#39;t want to have to type <code>new</code>. Anyways, here it is in action:</p>
+<pre><code class="lang-js"><span class="hljs-built_in">Sum</span>(<span class="hljs-number">1</span>).<span class="hljs-built_in">concat</span>(<span class="hljs-built_in">Sum</span>(<span class="hljs-number">3</span>)) // <span class="hljs-built_in">Sum</span>(<span class="hljs-number">4</span>)
+<span class="hljs-built_in">Sum</span>(<span class="hljs-number">4</span>).<span class="hljs-built_in">concat</span>(<span class="hljs-built_in">Sum</span>(<span class="hljs-number">37</span>)) // <span class="hljs-built_in">Sum</span>(<span class="hljs-number">41</span>)
+</code></pre>
+<p>Just like that, we can program to an interface, not an implementation. Since this interface comes from group theory it has centuries of literature backing it up. Free docs!</p>
+<p>Now, as mentioned, <code>Sum</code> is not <em>pointed</em>, nor a <em>functor</em>. As an exercise, go back and check the laws to see why. Okay, I&#39;ll just tell you: it can only hold a number, so <code>map</code> does not make sense here as we cannot transform the underlying value to another type. That would be a very limited <code>map</code> indeed!</p>
+<p>So why is this useful? Well, as with any interface, we can swap out our instance to achieve different results:</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> Product = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> ({ x, <span class="hljs-attr">concat</span>: <span class="hljs-function"><span class="hljs-params">other</span> =&gt;</span> Product(x * other.x) })
+
+<span class="hljs-keyword">const</span> Min = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> ({ x, <span class="hljs-attr">concat</span>: <span class="hljs-function"><span class="hljs-params">other</span> =&gt;</span> Min(x &lt; other.x ? x : other.x) })
+
+<span class="hljs-keyword">const</span> Max = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> ({ x, <span class="hljs-attr">concat</span>: <span class="hljs-function"><span class="hljs-params">other</span> =&gt;</span> Max(x &gt; other.x ? x : other.x) })
+</code></pre>
+<p>This isn&#39;t limited to numbers, though. Let&#39;s see some other types:</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> Any = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> ({ x, <span class="hljs-attr">concat</span>: <span class="hljs-function"><span class="hljs-params">other</span> =&gt;</span> Any(x || other.x) })
+<span class="hljs-keyword">const</span> All = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> ({ x, <span class="hljs-attr">concat</span>: <span class="hljs-function"><span class="hljs-params">other</span> =&gt;</span> All(x &amp;&amp; other.x) })
+
+Any(<span class="hljs-literal">false</span>).concat(Any(<span class="hljs-literal">true</span>)) <span class="hljs-comment">// Any(true)</span>
+Any(<span class="hljs-literal">false</span>).concat(Any(<span class="hljs-literal">false</span>)) <span class="hljs-comment">// Any(false)</span>
+
+All(<span class="hljs-literal">false</span>).concat(All(<span class="hljs-literal">true</span>)) <span class="hljs-comment">// All(false)</span>
+All(<span class="hljs-literal">true</span>).concat(All(<span class="hljs-literal">true</span>)) <span class="hljs-comment">// All(true)</span>
+
+[<span class="hljs-number">1</span>,<span class="hljs-number">2</span>].concat([<span class="hljs-number">3</span>,<span class="hljs-number">4</span>]) <span class="hljs-comment">// [1,2,3,4]</span>
+
+<span class="hljs-string">"miracle grow"</span>.concat(<span class="hljs-string">"n"</span>) <span class="hljs-comment">// miracle grown"</span>
+
+<span class="hljs-built_in">Map</span>({<span class="hljs-attr">day</span>: <span class="hljs-string">'night'</span>}).concat(<span class="hljs-built_in">Map</span>({<span class="hljs-attr">white</span>: <span class="hljs-string">'nikes'</span>})) <span class="hljs-comment">// Map({day: 'night', white: 'nikes'})</span>
+</code></pre>
+<p>If you stare at these long enough the pattern will pop out at you like a magic eye poster. It&#39;s everywhere. We&#39;re merging data structures, combining logic, building strings...it seems one can bludgeon almost any task into this combination based interface.</p>
+<p>I&#39;ve used <code>Map</code> a few times now. Pardon me if you two weren&#39;t properly introduced. <code>Map</code> simply wraps <code>Object</code> so we can embellish it with some extra methods without altering the fabric of the universe.</p>
+<h2 id="all-my-favourite-functors-are-semigroups-">All my favourite functors are semigroups.</h2>
+<p>The types we&#39;ve seen so far which implement the functor interface all implement semigroup one as well. Let&#39;s look at <code>Identity</code> (the artist previously known as Container):</p>
+<pre><code class="lang-js">Identity.prototype.concat = <span class="hljs-keyword">function</span>(other) {
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Identity(<span class="hljs-keyword">this</span>.<span class="hljs-number">__</span><span class="hljs-keyword">value</span>.concat(other.<span class="hljs-number">__</span><span class="hljs-keyword">value</span>))
+}
+
+Identity.<span class="hljs-keyword">of</span>(Sum(<span class="hljs-number">4</span>)).concat(Identity.<span class="hljs-keyword">of</span>(Sum(<span class="hljs-number">1</span>))) <span class="hljs-comment">// Identity(Sum(5))</span>
+Identity.<span class="hljs-keyword">of</span>(<span class="hljs-number">4</span>).concat(Identity.<span class="hljs-keyword">of</span>(<span class="hljs-number">1</span>)) <span class="hljs-comment">// TypeError: this.__value.concat is not a function</span>
+</code></pre>
+<p>It is a <em>semigroup</em> if and only if its <code>__value</code> is a <em>semigroup</em>. Like a butterfingered hang glider, it is one whilst it holds one.</p>
+<p>Other types have similar behavior:</p>
+<pre><code class="lang-js">// combine with error handling
+<span class="hljs-built_in">Right</span>(<span class="hljs-built_in">Sum</span>(<span class="hljs-number">2</span>)).<span class="hljs-built_in">concat</span>(<span class="hljs-built_in">Right</span>(<span class="hljs-built_in">Sum</span>(<span class="hljs-number">3</span>))) // <span class="hljs-built_in">Right</span>(<span class="hljs-built_in">Sum</span>(<span class="hljs-number">5</span>))
+<span class="hljs-built_in">Right</span>(<span class="hljs-built_in">Sum</span>(<span class="hljs-number">2</span>)).<span class="hljs-built_in">concat</span>(<span class="hljs-built_in">Left</span>('some error')) // <span class="hljs-built_in">Left</span>('some error')
+
+
+// combine async
+Task.of([<span class="hljs-number">1</span>,<span class="hljs-number">2</span>]).<span class="hljs-built_in">concat</span>(Task.of([<span class="hljs-number">3</span>,<span class="hljs-number">4</span>])) // Task([<span class="hljs-number">1</span>,<span class="hljs-number">2</span>,<span class="hljs-number">3</span>,<span class="hljs-number">4</span>])
+</code></pre>
+<p>This gets particularly useful when we stack these semigroups into a cascading combination:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// formValues :: Selector -&gt; IO (Map String String)</span>
+<span class="hljs-comment">// validate :: Map String String -&gt; Either Error (Map String String)</span>
+
+<span class="hljs-selector-tag">formValues</span>(<span class="hljs-string">'#signup'</span>)<span class="hljs-selector-class">.map</span>(validate)<span class="hljs-selector-class">.concat</span>(formValues(<span class="hljs-string">'#terms'</span>).map(validate)) <span class="hljs-comment">// IO(Right(Map({username: 'andre3000', accepted: true})))</span>
+<span class="hljs-selector-tag">formValues</span>(<span class="hljs-string">'#signup'</span>)<span class="hljs-selector-class">.map</span>(validate)<span class="hljs-selector-class">.concat</span>(formValues(<span class="hljs-string">'#terms'</span>).map(validate)) <span class="hljs-comment">// IO(Left('one must accept our totalitarian agreement'))</span>
+
+<span class="hljs-selector-tag">serverA</span><span class="hljs-selector-class">.get</span>(<span class="hljs-string">'/friends'</span>)<span class="hljs-selector-class">.concat</span>(serverB.get(<span class="hljs-string">'/friends'</span>)) <span class="hljs-comment">// Task([friend1, friend2])</span>
+
+<span class="hljs-comment">// loadSetting :: String -&gt; Task Error (Maybe (Map String Boolean))</span>
+<span class="hljs-selector-tag">loadSetting</span>(<span class="hljs-string">'email'</span>)<span class="hljs-selector-class">.concat</span>(loadSetting(<span class="hljs-string">'general'</span>)) <span class="hljs-comment">// Task(Maybe(Map({backgroundColor: true, autoSave: false})))</span>
+</code></pre>
+<p>In the top example, we&#39;ve combined an <code>IO</code> holding an <code>Either</code> holding a <code>Map</code> to validate and merge form values. Next, we&#39;ve hit a couple of different servers and combined their results in an async way using <code>Task</code> and <code>Array</code>. Lastly, we&#39;ve stacked <code>Task</code>, <code>Maybe</code>, and <code>Map</code> to load, parse, and merge multiple settings.</p>
+<p>These can be <code>chain</code>ed or <code>ap</code>&#39;d, but <em>semigroups</em> capture what we&#39;d like to do much more concisely.</p>
+<p>This extends beyond functors. In fact, it turns out that anything made up entirely of semigroups, is itself, a semigroup: if we can concat the kit, then we can concat the caboodle.</p>
+<pre><code class="lang-js">const Analytics = (clicks, path, idleTime) =&gt; ({
+  clicks,
+  path,
+  idleTime,
+  <span class="hljs-keyword">concat</span>: other =&gt;
+    Analytics(clicks.<span class="hljs-keyword">concat</span>(other.clicks), path.<span class="hljs-keyword">concat</span>(other.path), idleTime.<span class="hljs-keyword">concat</span>(other.idleTime))
+})
+
+Analytics(Sum(<span class="hljs-number">2</span>), [<span class="hljs-string">'/home'</span>, <span class="hljs-string">'/about'</span>], Right(Max(<span class="hljs-number">2000</span>))).<span class="hljs-keyword">concat</span>(Analytics(Sum(<span class="hljs-number">1</span>), [<span class="hljs-string">'/contact'</span>], Right(Max(<span class="hljs-number">1000</span>))))
+// Analytics(Sum(<span class="hljs-number">3</span>), [<span class="hljs-string">'/home'</span>, <span class="hljs-string">'/about'</span>, <span class="hljs-string">'/contact'</span>], Right(Max(<span class="hljs-number">2000</span>)))
+</code></pre>
+<p>See, everything knows how to combine itself nicely. Turns out, we could do the same thing for free just by using the <code>Map</code> type:</p>
+<pre><code class="lang-js"><span class="hljs-selector-tag">Map</span>({<span class="hljs-attribute">clicks</span>: Sum(<span class="hljs-number">2</span>), <span class="hljs-attribute">path</span>: [<span class="hljs-string">'/home'</span>, <span class="hljs-string">'/about'</span>], <span class="hljs-attribute">idleTime</span>: Right(Max(<span class="hljs-number">2000</span>))})<span class="hljs-selector-class">.concat</span>(Map({<span class="hljs-attribute">clicks</span>: Sum(<span class="hljs-number">1</span>), <span class="hljs-attribute">path</span>: [<span class="hljs-string">'/contact'</span>], <span class="hljs-attribute">idleTime</span>: Right(Max(<span class="hljs-number">1000</span>))}))
+<span class="hljs-comment">// Map({clicks: Sum(3), path: ['/home', '/about', '/contact'], idleTime: Right(Max(2000))})</span>
+</code></pre>
+<p>We can stack and combine as many of these as we&#39;d like. It&#39;s simply a matter of adding another tree to the forest, or another flame to the forest fire depending on your codebase.</p>
+<p>The default, intuitive behavior is to combine what a type is holding, however, there are cases where we ignore what&#39;s inside and combine the containers themselves. Consider a type like <code>Stream</code>:</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> submitStream = Stream.fromEvent(<span class="hljs-string">'click'</span>, $(<span class="hljs-string">'#submit'</span>))
+<span class="hljs-keyword">const</span> enterStream = filter(<span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> x.key === <span class="hljs-string">'Enter'</span>, Stream.fromEvent(<span class="hljs-string">'keydown'</span>, $(<span class="hljs-string">'#myForm'</span>)))
+
+submitStream.concat(enterStream).map(submitForm) <span class="hljs-comment">// Stream()</span>
+</code></pre>
+<p>We can combine event streams by capturing events from both as one new stream. Alternatively, we could have combined them by insisting they hold a semigroup. In fact, there are many possible instances for each type. Consider <code>Task</code>, we can combine them by choosing the earlier or later of the two. We can always chose the first <code>Right</code> instead of short circuiting on <code>Left</code> which has the effect of ignoring errors. There is an interface called <em>Alternative</em> which implements some of these, well, alternative instances, typically focused on choice rather than cascading combination. It is worth looking into if you are in need of such functionality.</p>
+<h2 id="monoids-for-nothing">Monoids for nothing</h2>
+<p>We were abstracting addition, but like the Babylonians, we lacked the concept of zero (there were zero mentions of it).</p>
+<p>Zero acts as <em>identity</em> meaning any element added to <code>0</code>, will return back that very same element. Abstraction-wise, it&#39;s helpful to think of <code>0</code> as a kind of neutral or <em>empty</em> element. It&#39;s important that it act the same way on the left and right side of our binary operation:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// identity</span>
+<span class="hljs-number">1</span> + <span class="hljs-number">0</span> = <span class="hljs-number">1</span>
+<span class="hljs-number">0</span> + <span class="hljs-number">1</span> = <span class="hljs-number">1</span>
+</code></pre>
+<p>Let&#39;s call this concept <code>empty</code> and create a new interface with it. Like so many startups, we&#39;ll choose a heinously uninformative, yet conveniently googleable name: <em>Monoid</em>. The recipe for <em>Monoid</em> is to take any <em>semigroup</em> and add a special <em>identity</em> element. We&#39;ll implement that with an <code>empty</code> function on the type itself:</p>
+<pre><code class="lang-js">Array.empty = <span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> []
+String.empty = <span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> <span class="hljs-string">""</span>
+Sum.empty = <span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> Sum(<span class="hljs-number">0</span>)
+Product.empty = <span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> Product(<span class="hljs-number">1</span>)
+Min.empty = <span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> Min(Infinity)
+Max.empty = <span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> Max(-Infinity)
+All.empty = <span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> All(<span class="hljs-literal">true</span>)
+Any.empty = <span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> Any(<span class="hljs-literal">false</span>)
+</code></pre>
+<p>When might an empty, identity value prove useful? That&#39;s like asking why zero is useful. Like not asking anything at all...</p>
+<p>When we have nothing else, who can we count on? Zero. How many bugs do we want? Zero. It&#39;s our tolerance for unsafe code. A fresh start. The ultimate price tag. It can annihilate everything in its path or save us in a pinch. A golden life saver and a pit of despair.</p>
+<p>Codewise, they correspond to sensible defaults:</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> settings = <span class="hljs-function">(<span class="hljs-params">prefix=<span class="hljs-string">""</span>, overrides=[], total=<span class="hljs-number">0</span></span>) =&gt;</span> ...
+
+const settings = <span class="hljs-function">(<span class="hljs-params">prefix=<span class="hljs-built_in">String</span>.empty(</span>), <span class="hljs-params">overrides</span>=<span class="hljs-params">Array</span>.<span class="hljs-params">empty</span><span class="hljs-params">()</span>, <span class="hljs-params">total</span>=<span class="hljs-params">Sum</span>.<span class="hljs-params">empty</span><span class="hljs-params">()</span>) =&gt;</span> ...
+</code></pre>
+<p>Or to return a useful value when we have nothing else:</p>
+<pre><code class="lang-js"><span class="hljs-function"><span class="hljs-title">sum</span><span class="hljs-params">([])</span></span> <span class="hljs-comment">// 0</span>
+</code></pre>
+<p>They are also the perfect initial value for an accumulator...</p>
+<h2 id="folding-down-the-house">Folding down the house</h2>
+<p>It just so happens that <code>concat</code> and <code>empty</code> fit perfectly in the first two slots of <code>reduce</code>. We can actually <code>reduce</code> an array of <em>semigroup</em>&#39;s down by ignoring the <em>empty</em> value, but as you can see, that leads to a precarious situation:</p>
+<pre><code class="lang-js">// concat<span class="hljs-keyword"> :</span>: Semigroup s =&gt; s -&gt; s -&gt; s<span class="hljs-built_in">
+const </span>concat = x =&gt; y =&gt; x.concat(y)
+
+[Sum(1), Sum(2)].reduce(concat) // Sum(3)
+
+[].reduce(concat) // TypeError: Reduce of empty<span class="hljs-built_in"> array </span>with no initial value
+</code></pre>
+<p>Boom goes the dynamite. Like a twisted ankle in a marathon, we have ourselves a runtime exception. JavaScript is more than happy to let us strap pistols to our sneakers before running - it is a conservative sort of language, I suppose, but it stops us dead in our tracks when the array is barren. What could it return anyhow? <code>NaN</code>, <code>false</code>, <code>-1</code>? If we were to continue on in our program, we&#39;d like a result of the right type. It could return a <code>Maybe</code> to indicate the possibility of failure, but we can do one better.</p>
+<p>Let&#39;s use our curried <code>reduce</code> function and make a safe version where the <code>empty</code> value is not optional. It shall henceforth be known as <code>fold</code>:</p>
+<pre><code class="lang-js">// <span class="hljs-built_in">fold</span> :: Monoid m =&gt; m -&gt; [m] -&gt; m
+const <span class="hljs-built_in">fold</span> = reduce(concat)
+</code></pre>
+<p>The initial <code>m</code> is our <code>empty</code> value - our neutral, starting point, then we take an array of <code>m</code>&#39;s and crush them down to one beautiful diamond like value.</p>
+<pre><code class="lang-js">fold(<span class="hljs-name">Sum</span>.empty(), [Sum(<span class="hljs-number">1</span>), Sum(<span class="hljs-number">2</span>)]) // Sum(<span class="hljs-number">3</span>)
+fold(<span class="hljs-name">Sum</span>.empty(), []) // Sum(<span class="hljs-number">0</span>)
+
+fold(<span class="hljs-name">Any</span>.empty(), [Any(<span class="hljs-name">false</span>), Any(<span class="hljs-name">true</span>)]) // Any(<span class="hljs-name">true</span>)
+fold(<span class="hljs-name">Any</span>.empty(), []) // Any(<span class="hljs-name">false</span>)
+
+
+fold(<span class="hljs-name">Either</span>.of(<span class="hljs-name">Max</span>.empty()), [Right(<span class="hljs-name">Max</span>(<span class="hljs-number">3</span>)), Right(<span class="hljs-name">Max</span>(<span class="hljs-number">21</span>)), Right(<span class="hljs-name">Max</span>(<span class="hljs-number">11</span>))]) // Right(<span class="hljs-name">Max</span>(<span class="hljs-number">21</span>))
+fold(<span class="hljs-name">Either</span>.of(<span class="hljs-name">Max</span>.empty()), [Right(<span class="hljs-name">Max</span>(<span class="hljs-number">3</span>)), Left('error retrieving value'), Right(<span class="hljs-name">Max</span>(<span class="hljs-number">11</span>))]) // Left('error retrieving value')
+
+fold(<span class="hljs-name">IO</span>.of([]), ['.link', 'a'].map($)) // IO([&lt;a&gt;, &lt;button class=<span class="hljs-string">"link"</span>/&gt;, &lt;a&gt;])
+</code></pre>
+<p>We&#39;ve provided a manual <code>empty</code> value for those last two since we can&#39;t define one on the type itself. That&#39;s totally fine. Typed languages can figure that out by themselves, but we have to pass it in here.</p>
+<h2 id="not-quite-a-monoid">Not quite a monoid</h2>
+<p>There are some <em>semigroups</em> that cannot become <em>monoids</em>, that is provide an initial value. Look at <code>First</code>:</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> First = x =&gt; ({ x, concat: other =&gt; First(x) })
+
+Map({id: First(123), isPaid: Any(<span class="hljs-keyword">true</span>), points: Sum(13)}).concat(Map({id: First(2242), isPaid: Any(<span class="hljs-keyword">false</span>), points: Sum(1)}))
+// Map({id: First(123), isPaid: Any(<span class="hljs-keyword">true</span>), points: Sum(14)})
+</code></pre>
+<p>We&#39;ll merge a couple of accounts and keep the <code>First</code> id. There is no way to define an <code>empty</code> value for it. Doesn&#39;t mean it&#39;s not useful.</p>
+<h2 id="grand-unifying-theory">Grand unifying theory</h2>
+<h2 id="group-theory-or-category-theory-">Group theory or Category theory?</h2>
+<p>The notion of a binary operation is everywhere in abstract algebra. It is, in fact, the primary operation for a <em>category</em>. We cannot, however, model our operation in category theory without an <em>identity</em>. This is the reason we start with a semi-group from group theory, then jump to a monoid in category theory once we have <em>empty</em>.</p>
+<p>Monoids form a single object category where the morphism is <code>concat</code>, <code>empty</code> is the identity, and composition is guaranteed.</p>
+<h3 id="composition-as-a-monoid">Composition as a monoid</h3>
+<p>Functions of type <code>a -&gt; a</code>, where the domain is in the same set as the codomain, are called <em>endomorphisms</em>. We can make a <em>monoid</em> called <code>Endo</code> which captures this idea:</p>
+<pre><code class="lang-js">const <span class="hljs-keyword">Endo</span> = <span class="hljs-keyword">run</span> =&gt; ({
+  <span class="hljs-keyword">run</span>,
+  concat: other =&gt;
+    <span class="hljs-keyword">Endo</span>(compose(<span class="hljs-keyword">run</span>, other.<span class="hljs-keyword">run</span>))
+})
+
+<span class="hljs-keyword">Endo</span>.empty = () =&gt; <span class="hljs-keyword">Endo</span>(identity)
+
+
+<span class="hljs-comment">// in action</span>
+
+<span class="hljs-comment">// thingDownFlipAndReverse :: Endo [String] -&gt; [String]</span>
+const thingDownFlipAndReverse = fold(<span class="hljs-keyword">Endo</span>(() =&gt; []), [<span class="hljs-keyword">Endo</span>(reverse), <span class="hljs-keyword">Endo</span>(sort), <span class="hljs-keyword">Endo</span>(append('thing down')])
+
+thingDownFlipAndReverse.<span class="hljs-keyword">run</span>(['<span class="hljs-keyword">let</span> me work it', 'is it worth it?'])
+<span class="hljs-comment">// ['thing down', 'let me work it', 'is it worth it?']</span>
+</code></pre>
+<p>Since they are all the same type, we can <code>concat</code> via <code>compose</code> and the types always line up.</p>
+<h3 id="monad-as-a-monoid">Monad as a monoid</h3>
+<p>You may have noticed that <code>join</code> is an operation which takes two (nested) monads and squashes them down to one in an associative fashion. It is also a natural transformation or &quot;functor function&quot;. As previously stated, we can make a category of functors as objects with natural transformations as morphisms. Now, if we specialize it to <em>Endofunctors</em>, that is functors of the same type, then <code>join</code> provides us with a monoid in the category of Endofunctors also known as a Monad. To show the exact formulation in code takes a little finagling which I encourage you to google, but that&#39;s the general idea.</p>
+<h3 id="applicative-as-a-monoid">Applicative as a monoid</h3>
+<p>Even applicative functors have a monoidal formulation known in the category theory as a <em>lax monoidal functor</em>. We can implement the interface as a monoid and recover <code>ap</code> from it:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// concat :: f a -&gt; f b -&gt; f [a, b]</span>
+<span class="hljs-comment">// empty :: () -&gt; f ()</span>
+
+<span class="hljs-comment">// ap :: Functor f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b</span>
+<span class="hljs-keyword">const</span> ap = compose(map(<span class="hljs-function">(<span class="hljs-params">[f, x]</span>) =&gt;</span> f(x)), concat)
+</code></pre>
+<h2 id="in-summary">In summary</h2>
+<p>So you see, everything is connected, or can be. This profound realization makes <em>Monoids</em> a powerful modelling tool for broad swaths of app architecture to the tiniest pieces of datum. I encourage you to think of <em>monoids</em> whenever direct accumulation or combination is part of your application, then once you&#39;ve got that down, start to stretch the definition to more applications (you&#39;d be surprised how much one can model with a <em>monoid</em>).</p>
+<h2 id="exercises">Exercises</h2>
