@@ -1,0 +1,242 @@
+<h1 id="chapter-10-applicative-functors">Chapter 10: Applicative Functors</h1>
+<h2 id="applying-applicatives">Applying Applicatives</h2>
+<p>The name <strong>applicative functor</strong> is pleasantly descriptive given its functional origins. Functional programmers are notorious for coming up with names like <code>mappend</code> or <code>liftA4</code>, which seem perfectly natural when viewed in the math lab, but hold the clarity of an indecisive Darth Vader at the drive thru in any other context.</p>
+<p>Anyhow, the name should spill the beans on what this interface gives us: <em>the ability to apply functors to each other</em>.</p>
+<p>Now, why would a normal, rational person such as yourself want such a thing? What does it even <em>mean</em> to apply one functor to another?</p>
+<p>To answer these questions, we&#39;ll start with a situation you may have already encountered in your functional travels. Let&#39;s say, hypothetically, that we have two functors (of the same type) and we&#39;d like to call a function with both of their values as arguments. Something simple like adding the values of two <code>Container</code>s.</p>
+<pre><code class="lang-js"><span class="hljs-comment">// We can't do this because the numbers are bottled up.</span>
+add(Container.<span class="hljs-keyword">of</span>(<span class="hljs-number">2</span>), Container.<span class="hljs-keyword">of</span>(<span class="hljs-number">3</span>));
+<span class="hljs-comment">// NaN</span>
+
+<span class="hljs-comment">// Let's use our trusty map</span>
+<span class="hljs-keyword">const</span> containerOfAdd2 = map(add, Container.<span class="hljs-keyword">of</span>(<span class="hljs-number">2</span>));
+<span class="hljs-comment">// Container(add(2))</span>
+</code></pre>
+<p>We have ourselves a <code>Container</code> with a partially applied function inside. More specifically, we have a <code>Container(add(2))</code> and we&#39;d like to apply its <code>add(2)</code> to the <code>3</code> in <code>Container(3)</code> to complete the call. In other words, we&#39;d like to apply one functor to another.</p>
+<p>Now, it just so happens that we already have the tools to accomplish this task. We can <code>chain</code> and then <code>map</code> the partially applied <code>add(2)</code> like so:</p>
+<pre><code class="lang-js"><span class="hljs-keyword">Container</span>.<span class="hljs-keyword">of</span>(2).chain(two =&gt; <span class="hljs-keyword">Container</span>.<span class="hljs-keyword">of</span>(3).map(add(two)));
+</code></pre>
+<p>The issue here is that we are stuck in the sequential world of monads wherein nothing may be evaluated until the previous monad has finished its business. We have ourselves two strong, independent values and I should think it unnecessary to delay the creation of <code>Container(3)</code> merely to satisfy the monad&#39;s sequential demands.</p>
+<p>In fact, it would be lovely if we could succinctly apply one functor&#39;s contents to another&#39;s value without these needless functions and variables should we find ourselves in this pickle jar.</p>
+<h2 id="ships-in-bottles">Ships in Bottles</h2>
+<p><img src="images/ship_in_a_bottle.jpg" alt="https://www.deviantart.com/hollycarden" /></p>
+<p><code>ap</code> is a function that can apply the function contents of one functor to the value contents of another. Say that five times fast.</p>
+<pre><code class="lang-js"><span class="hljs-keyword">Container</span>.<span class="hljs-keyword">of</span>(add(2)).ap(<span class="hljs-keyword">Container</span>.<span class="hljs-keyword">of</span>(3));
+// <span class="hljs-keyword">Container</span>(5)
+
+// all together now
+
+<span class="hljs-keyword">Container</span>.<span class="hljs-keyword">of</span>(2).map(add).ap(<span class="hljs-keyword">Container</span>.<span class="hljs-keyword">of</span>(3));
+// <span class="hljs-keyword">Container</span>(5)
+</code></pre>
+<p>There we are, nice and neat. Good news for <code>Container(3)</code> as it&#39;s been set free from the jail of the nested monadic function. It&#39;s worth mentioning again that <code>add</code>, in this case, gets partially applied during the first <code>map</code> so this only works when <code>add</code> is curried.</p>
+<p>We can define <code>ap</code> like so:</p>
+<pre><code class="lang-js">Container.prototype.ap = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(otherContainer)</span> </span>{
+  <span class="hljs-keyword">return</span> otherContainer.map(<span class="hljs-keyword">this</span>.$value);
+};
+</code></pre>
+<p>Remember, <code>this.$value</code> will be a function and we&#39;ll be accepting another functor so we need only <code>map</code> it. And with that we have our interface definition:</p>
+<blockquote>
+<p>An <em>applicative functor</em> is a pointed functor with an <code>ap</code> method</p>
+</blockquote>
+<p>Note the dependence on <strong>pointed</strong>. The pointed interface is crucial here as we&#39;ll see throughout the following examples.</p>
+<p>Now, I sense your skepticism (or perhaps confusion and horror), but keep an open mind; this <code>ap</code> character will prove useful. Before we get into it, let&#39;s explore a nice property.</p>
+<pre><code class="lang-js">F.of<span class="hljs-comment">(x)</span>.map<span class="hljs-comment">(f)</span> === F.of<span class="hljs-comment">(f)</span>.ap<span class="hljs-comment">(F.of(x)</span>);
+</code></pre>
+<p>In proper English, mapping <code>f</code> is equivalent to <code>ap</code>ing a functor of <code>f</code>. Or in properer English, we can place <code>x</code> into our container and <code>map(f)</code> OR we can lift both <code>f</code> and <code>x</code> into our container and <code>ap</code> them. This allows us to write in a left-to-right fashion:</p>
+<pre><code class="lang-js">Maybe.<span class="hljs-keyword">of</span>(add).ap(Maybe.<span class="hljs-keyword">of</span>(<span class="hljs-number">2</span>)).ap(Maybe.<span class="hljs-keyword">of</span>(<span class="hljs-number">3</span>));
+// Maybe(<span class="hljs-number">5</span>)
+
+<span class="hljs-keyword">Task</span>.<span class="hljs-keyword">of</span>(add).ap(<span class="hljs-keyword">Task</span>.<span class="hljs-keyword">of</span>(<span class="hljs-number">2</span>)).ap(<span class="hljs-keyword">Task</span>.<span class="hljs-keyword">of</span>(<span class="hljs-number">3</span>));
+// <span class="hljs-keyword">Task</span>(<span class="hljs-number">5</span>)
+</code></pre>
+<p>One might even recognise the vague shape of a normal function call if viewed mid squint. We&#39;ll look at the pointfree version later in the chapter, but for now, this is the preferred way to write such code. Using <code>of</code>, each value gets transported to the magical land of containers, this parallel universe where each application can be async or null or what have you and <code>ap</code> will apply functions within this fantastical place. It&#39;s like building a ship in a bottle.</p>
+<p>Did you see there? We used <code>Task</code> in our example. This is a prime situation where applicative functors pull their weight. Let&#39;s look at a more in-depth example.</p>
+<h2 id="coordination-motivation">Coordination Motivation</h2>
+<p>Say we&#39;re building a travel site and we&#39;d like to retrieve both a list of tourist destinations and local events. Each of these are separate, stand-alone api calls.</p>
+<pre><code class="lang-js"><span class="hljs-comment">// Http.get :: String -&gt; Task Error HTML</span>
+
+<span class="hljs-keyword">const</span> renderPage = curry((destinations, events) =&gt; { <span class="hljs-comment">/* render page */</span> });
+
+<span class="hljs-built_in">Task</span>.of(renderPage).ap(Http.<span class="hljs-built_in">get</span>(<span class="hljs-string">'/destinations'</span>)).ap(Http.<span class="hljs-built_in">get</span>(<span class="hljs-string">'/events'</span>));
+<span class="hljs-comment">// Task("&lt;div&gt;some page with dest and events&lt;/div&gt;")</span>
+</code></pre>
+<p>Both <code>Http</code> calls will happen instantly and <code>renderPage</code> will be called when both are resolved. Contrast this with the monadic version where one <code>Task</code> must finish before the next fires off. Since we don&#39;t need the destinations to retrieve events, we are free from sequential evaluation.</p>
+<p>Again, because we&#39;re using partial application to achieve this result, we must ensure <code>renderPage</code> is curried or it will not wait for both <code>Tasks</code> to finish. Incidentally, if you&#39;ve ever had to do such a thing manually, you&#39;ll appreciate the astonishing simplicity of this interface. This is the kind of beautiful code that takes us one step closer to the singularity.</p>
+<p>Let&#39;s look at another example.</p>
+<pre><code class="lang-js"><span class="hljs-comment">// $ :: String -&gt; IO DOM</span>
+<span class="hljs-keyword">const</span> $ = <span class="hljs-function"><span class="hljs-params">selector</span> =&gt;</span> <span class="hljs-keyword">new</span> IO(<span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> <span class="hljs-built_in">document</span>.querySelector(selector));
+
+<span class="hljs-comment">// getVal :: String -&gt; IO String</span>
+<span class="hljs-keyword">const</span> getVal = compose(map(prop(<span class="hljs-string">'value'</span>)), $);
+
+<span class="hljs-comment">// signIn :: String -&gt; String -&gt; Bool -&gt; User</span>
+<span class="hljs-keyword">const</span> signIn = curry(<span class="hljs-function">(<span class="hljs-params">username, password, rememberMe</span>) =&gt;</span> { <span class="hljs-comment">/* signing in */</span> });
+
+IO.of(signIn).ap(getVal(<span class="hljs-string">'#email'</span>)).ap(getVal(<span class="hljs-string">'#password'</span>)).ap(IO.of(<span class="hljs-literal">false</span>));
+<span class="hljs-comment">// IO({ id: 3, email: 'gg@allin.com' })</span>
+</code></pre>
+<p><code>signIn</code> is a curried function of 3 arguments so we have to <code>ap</code> accordingly. With each <code>ap</code>, <code>signIn</code> receives one more argument until it is complete and runs. We can continue this pattern with as many arguments as necessary. Another thing to note is that two arguments end up naturally in <code>IO</code> whereas the last one needs a little help from <code>of</code> to lift it into <code>IO</code> since <code>ap</code> expects the function and all its arguments to be in the same type.</p>
+<h2 id="bro-do-you-even-lift-">Bro, Do You Even Lift?</h2>
+<p>Let&#39;s examine a pointfree way to write these applicative calls. Since we know <code>map</code> is equal to <code>of/ap</code>, we can write generic functions that will <code>ap</code> as many times as we specify:</p>
+<pre><code class="lang-js"><span class="hljs-symbol">const</span> liftA2 = curry((g, <span class="hljs-built_in">f1</span>, <span class="hljs-built_in">f2</span>) =&gt; <span class="hljs-built_in">f1</span>.map(g).ap(<span class="hljs-built_in">f2</span>))<span class="hljs-comment">;</span>
+
+<span class="hljs-symbol">const</span> liftA3 = curry((g, <span class="hljs-built_in">f1</span>, <span class="hljs-built_in">f2</span>, <span class="hljs-built_in">f3</span>) =&gt; <span class="hljs-built_in">f1</span>.map(g).ap(<span class="hljs-built_in">f2</span>).ap(<span class="hljs-built_in">f3</span>))<span class="hljs-comment">;</span>
+
+// liftA4, etc
+</code></pre>
+<p><code>liftA2</code> is a strange name. It sounds like one of the finicky freight elevators in a rundown factory or a vanity plate for a cheap limo company. Once enlightened, however, it&#39;s self explanatory: lift these pieces into the applicative functor world.</p>
+<p>When I first saw this 2-3-4 nonsense it struck me as ugly and unnecessary. After all, we can check the arity of functions in JavaScript and build this up dynamically. However, it is often useful to partially apply <code>liftA(N)</code> itself, so it cannot vary in argument length.</p>
+<p>Let&#39;s see this in use:</p>
+<pre><code class="lang-js">// checkEmail :: <span class="hljs-keyword">User</span> <span class="hljs-title">-&gt; Either</span> <span class="hljs-keyword">String</span> Email
+// checkName :: <span class="hljs-keyword">User</span> <span class="hljs-title">-&gt; Either</span> <span class="hljs-keyword">String</span> <span class="hljs-keyword">String</span>
+
+const <span class="hljs-keyword">user</span> <span class="hljs-title">= {
+  name</span>: 'John Doe',
+  email: 'blurp_blurp',
+};
+
+//  createUser :: Email -&gt; <span class="hljs-keyword">String</span> -&gt; IO <span class="hljs-keyword">User</span>
+<span class="hljs-title">const</span> createUser = curry((email, name) =&gt; { /* creating... */ });
+
+Either.of(createUser).ap(checkEmail(user)).ap(checkName(user));
+// Left('invalid email')
+
+liftA2(createUser, checkEmail(user), checkName(user));
+// Left('invalid email')
+</code></pre>
+<p>Since <code>createUser</code> takes two arguments, we use the corresponding <code>liftA2</code>. The two statements are equivalent, but the <code>liftA2</code> version has no mention of <code>Either</code>. This makes it more generic and flexible since we are no longer married to a specific type.</p>
+<p>Let&#39;s see the previous examples written this way:</p>
+<pre><code class="lang-js">liftA2(<span class="hljs-name">add</span>, Maybe.of(<span class="hljs-number">2</span>), Maybe.of(<span class="hljs-number">3</span>))<span class="hljs-comment">;</span>
+// Maybe(<span class="hljs-number">5</span>)
+
+liftA2(<span class="hljs-name">renderPage</span>, Http.get('/destinations'), Http.get('/events'))<span class="hljs-comment">;</span>
+// Task('&lt;div&gt;some page with dest and events&lt;/div&gt;')
+
+liftA3(<span class="hljs-name">signIn</span>, getVal('#email'), getVal('#password'), IO.of(<span class="hljs-name">false</span>))<span class="hljs-comment">;</span>
+// IO({ id: <span class="hljs-number">3</span>, email: 'gg@allin.com' })
+</code></pre>
+<h2 id="operators">Operators</h2>
+<p>In languages like Haskell, Scala, PureScript, and Swift, where it is possible to create your own infix operators you may see syntax like this:</p>
+<pre><code class="lang-hs">-- Haskell / PureScript
+add <span class="hljs-tag">&lt;<span class="hljs-name">$</span>&gt;</span> Right 2 <span class="hljs-tag">&lt;<span class="hljs-name">*</span>&gt;</span> Right 3
+</code></pre>
+<pre><code class="lang-js"><span class="hljs-comment">// JavaScript</span>
+map<span class="hljs-comment">(add, Right(2)</span>).ap<span class="hljs-comment">(Right(3)</span>);
+</code></pre>
+<p>It&#39;s helpful to know that <code>&lt;$&gt;</code> is <code>map</code> (aka <code>fmap</code>) and <code>&lt;*&gt;</code> is just <code>ap</code>. This allows for a more natural function application style and can help remove some parenthesis.</p>
+<h2 id="free-can-openers">Free Can Openers</h2>
+<p><img src="images/canopener.jpg" alt="http://www.breannabeckmeyer.com/" /></p>
+<p>We haven&#39;t spoken much about derived functions. Seeing as all of these interfaces are built off of each other and obey a set of laws, we can define some weaker interfaces in terms of the stronger ones.</p>
+<p>For instance, we know that an applicative is first a functor, so if we have an applicative instance, surely we can define a functor for our type.</p>
+<p>This kind of perfect computational harmony is possible because we&#39;re working within a mathematical framework. Mozart couldn&#39;t have done better even if he had torrented Ableton as a child.</p>
+<p>I mentioned earlier that <code>of/ap</code> is equivalent to <code>map</code>. We can use this knowledge to define <code>map</code> for free:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// map derived from of/ap</span>
+X.prototype.map = function map(f) {
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.<span class="hljs-keyword">constructor</span>.of(f).ap(<span class="hljs-keyword">this</span>);
+};
+</code></pre>
+<p>Monads are at the top of the food chain, so to speak, so if we have <code>chain</code>, we get functor and applicative for free:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// map derived from chain</span>
+X.prototype.map = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">map</span>(<span class="hljs-params">f</span>) </span>{
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.chain(<span class="hljs-function"><span class="hljs-params">a</span> =&gt;</span> <span class="hljs-keyword">this</span>.constructor.of(f(a)));
+};
+
+<span class="hljs-comment">// ap derived from chain/map</span>
+X.prototype.ap = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">ap</span>(<span class="hljs-params">other</span>) </span>{
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.chain(<span class="hljs-function"><span class="hljs-params">f</span> =&gt;</span> other.map(f));
+};
+</code></pre>
+<p>If we can define a monad, we can define both the applicative and functor interfaces. This is quite remarkable as we get all of these can openers for free. We can even examine a type and automate this process.</p>
+<p>It should be pointed out that part of <code>ap</code>&#39;s appeal is the ability to run things concurrently so defining it via <code>chain</code> is missing out on that optimization. Despite that, it&#39;s good to have an immediate working interface while one works out the best possible implementation.</p>
+<p>Why not just use monads and be done with it, you ask? It&#39;s good practice to work with the level of power you need, no more, no less. This keeps cognitive load to a minimum by ruling out possible functionality. For this reason, it&#39;s good to favor applicatives over monads.</p>
+<p>Monads have the unique ability to sequence computation, assign variables, and halt further execution all thanks to the downward nesting structure. When one sees applicatives in use, they needn&#39;t concern themselves with any of that business.</p>
+<p>Now, on to the legalities ...</p>
+<h2 id="laws">Laws</h2>
+<p>Like the other mathematical constructs we&#39;ve explored, applicative functors hold some useful properties for us to rely on in our daily code. First off, you should know that applicatives are &quot;closed under composition&quot;, meaning <code>ap</code> will never change container types on us (yet another reason to favor over monads). That&#39;s not to say we cannot have multiple different effects - we can stack our types knowing that they will remain the same during the entirety of our application.</p>
+<p>To demonstrate:</p>
+<pre><code class="lang-js">const tOfM = compose(<span class="hljs-name">Task</span>.of, Maybe.of)<span class="hljs-comment">;</span>
+
+liftA2(<span class="hljs-name">liftA2</span>(<span class="hljs-name">concat</span>), tOfM('Rainy Days and Mondays'), tOfM(' always get me down'))<span class="hljs-comment">;</span>
+// Task(<span class="hljs-name">Maybe</span>(<span class="hljs-name">Rainy</span> Days and Mondays always get me down))
+</code></pre>
+<p>See, no need to worry about different types getting in the mix.</p>
+<p>Time to look at our favorite categorical law: <em>identity</em>:</p>
+<h3 id="identity">Identity</h3>
+<pre><code class="lang-js"><span class="hljs-comment">// identity</span>
+A.of<span class="hljs-comment">(id)</span>.ap<span class="hljs-comment">(v)</span> === v;
+</code></pre>
+<p>Right, so applying <code>id</code> all from within a functor shouldn&#39;t alter the value in <code>v</code>. For example:</p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> v = Identity.<span class="hljs-keyword">of</span>(<span class="hljs-string">'Pillow Pets'</span>);
+Identity.<span class="hljs-keyword">of</span>(id).ap(v) === v;
+</code></pre>
+<p><code>Identity.of(id)</code> makes me chuckle at its futility. Anyway, what&#39;s interesting is that, as we&#39;ve already established, <code>of/ap</code> is the same as <code>map</code> so this law follows directly from functor identity: <code>map(id) == id</code>.</p>
+<p>The beauty in using these laws is that, like a militant kindergarten gym coach, they force all of our interfaces to play well together.</p>
+<h3 id="homomorphism">Homomorphism</h3>
+<pre><code class="lang-js"><span class="hljs-comment">// homomorphism</span>
+A.of<span class="hljs-comment">(f)</span>.ap<span class="hljs-comment">(A.of(x)</span>) === A.of<span class="hljs-comment">(f(x)</span>);
+</code></pre>
+<p>A <em>homomorphism</em> is just a structure preserving map. In fact, a functor is just a <em>homomorphism</em> between categories as it preserves the original category&#39;s structure under the mapping.</p>
+<p>We&#39;re really just stuffing our normal functions and values into a container and running the computation in there so it should come as no surprise that we will end up with the same result if we apply the whole thing inside the container (left side of the equation) or apply it outside, then place it in there (right side).</p>
+<p>A quick example:</p>
+<pre><code class="lang-js">Either.<span class="hljs-keyword">of</span>(toUpperCase).ap(Either.<span class="hljs-keyword">of</span>(<span class="hljs-symbol">'oreos</span>')) === Either.<span class="hljs-keyword">of</span>(toUpperCase(<span class="hljs-symbol">'oreos</span>'));
+</code></pre>
+<h3 id="interchange">Interchange</h3>
+<p>The <em>interchange</em> law states that it doesn&#39;t matter if we choose to lift our function into the left or right side of <code>ap</code>.</p>
+<pre><code class="lang-js"><span class="hljs-comment">// interchange</span>
+v.ap<span class="hljs-comment">(A.of(x)</span>) === A.of<span class="hljs-comment">(f =&gt; f(x)</span>).ap<span class="hljs-comment">(v)</span>;
+</code></pre>
+<p>Here is an example:</p>
+<pre><code class="lang-js">const v = <span class="hljs-keyword">Task</span>.<span class="hljs-keyword">of</span>(<span class="hljs-keyword">reverse</span>);
+const x = <span class="hljs-symbol">'Sparklehorse</span>';
+
+v.ap(<span class="hljs-keyword">Task</span>.<span class="hljs-keyword">of</span>(x)) === <span class="hljs-keyword">Task</span>.<span class="hljs-keyword">of</span>(f =&gt; f(x)).ap(v);
+</code></pre>
+<h3 id="composition">Composition</h3>
+<p>And finally composition which is just a way to check that our standard function composition holds when applying inside of containers.</p>
+<pre><code class="lang-js"><span class="hljs-comment">// composition</span>
+A.of<span class="hljs-comment">(compose)</span>.ap<span class="hljs-comment">(u)</span>.ap<span class="hljs-comment">(v)</span>.ap<span class="hljs-comment">(w)</span> === u.ap<span class="hljs-comment">(v.ap(w)</span>);
+</code></pre>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> u = IO.<span class="hljs-keyword">of</span>(toUpperCase);
+<span class="hljs-keyword">const</span> v = IO.<span class="hljs-keyword">of</span>(concat(<span class="hljs-string">'&amp; beyond'</span>));
+<span class="hljs-keyword">const</span> w = IO.<span class="hljs-keyword">of</span>(<span class="hljs-string">'blood bath '</span>);
+
+IO.<span class="hljs-keyword">of</span>(compose).ap(u).ap(v).ap(w) === u.ap(v.ap(w));
+</code></pre>
+<h2 id="in-summary">In Summary</h2>
+<p>A good use case for applicatives is when one has multiple functor arguments. They give us the ability to apply functions to arguments all within the functor world. Though we could already do so with monads, we should prefer applicative functors when we aren&#39;t in need of monadic specific functionality.</p>
+<p>We&#39;re almost finished with container apis. We&#39;ve learned how to <code>map</code>, <code>chain</code>, and now <code>ap</code> functions. In the next chapter, we&#39;ll learn how to work better with multiple functors and disassemble them in a principled way.</p>
+<p><a href="ch11.md">Chapter 11: Transformation Again, Naturally</a></p>
+<h2 id="exercises">Exercises</h2>
+<p>{% exercise %}<br>Write a function that adds two possibly null numbers together using <code>Maybe</code> and <code>ap</code>.  </p>
+<p>{% initial src=&quot;./exercises/ch10/exercise_a.js#L3;&quot; %}  </p>
+<pre><code class="lang-js">// safeAdd <span class="hljs-type">::</span> Maybe <span class="hljs-built_in">Number</span> -&gt; Maybe <span class="hljs-built_in">Number</span> -&gt; Maybe <span class="hljs-built_in">Number</span>  
+<span class="hljs-keyword">const</span> safeAdd = undefined;
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch10/solution_a.js&quot; %}<br>{% validation src=&quot;./exercises/ch10/validation_a.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
+<hr>
+<p>{% exercise %}<br>Rewrite <code>safeAdd</code> from exercise_b to use <code>liftA2</code> instead of <code>ap</code>.  </p>
+<p>{% initial src=&quot;./exercises/ch10/exercise_b.js#L3;&quot; %}  </p>
+<pre><code class="lang-js">// safeAdd <span class="hljs-type">::</span> Maybe <span class="hljs-built_in">Number</span> -&gt; Maybe <span class="hljs-built_in">Number</span> -&gt; Maybe <span class="hljs-built_in">Number</span>  
+<span class="hljs-keyword">const</span> safeAdd = undefined;
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch10/solution_b.js&quot; %}<br>{% validation src=&quot;./exercises/ch10/validation_b.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
+<hr>
+<p>For the next exercise, we consider the following helpers:  </p>
+<pre><code class="lang-js"><span class="hljs-keyword">const</span> localStorage = {  
+  <span class="hljs-attr">player1</span>: { <span class="hljs-attr">id</span>:<span class="hljs-number">1</span>, <span class="hljs-attr">name</span>: <span class="hljs-string">'Albert'</span> },  
+  <span class="hljs-attr">player2</span>: { <span class="hljs-attr">id</span>:<span class="hljs-number">2</span>, <span class="hljs-attr">name</span>: <span class="hljs-string">'Theresa'</span> },  
+};  
+
+<span class="hljs-comment">// getFromCache :: String -&gt; IO User  </span>
+<span class="hljs-keyword">const</span> getFromCache = <span class="hljs-function"><span class="hljs-params">x</span> =&gt;</span> <span class="hljs-keyword">new</span> IO(<span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> localStorage[x]);  
+
+<span class="hljs-comment">// game :: User -&gt; User -&gt; String  </span>
+<span class="hljs-keyword">const</span> game = curry(<span class="hljs-function">(<span class="hljs-params">p1, p2</span>) =&gt;</span> <span class="hljs-string">`<span class="hljs-subst">${p1.name}</span> vs <span class="hljs-subst">${p2.name}</span>`</span>);
+</code></pre>
+<p>{% exercise %}<br>Write an IO that gets both player1 and player2 from the cache and starts the game.  </p>
+<p>{% initial src=&quot;./exercises/ch10/exercise_c.js#L16;&quot; %}  </p>
+<pre><code class="lang-js">// startGame <span class="hljs-type">::</span> <span class="hljs-built_in">IO</span> <span class="hljs-built_in">String</span>  
+<span class="hljs-keyword">const</span> startGame = undefined;
+</code></pre>
+<p>{% solution src=&quot;./exercises/ch10/solution_c.js&quot; %}<br>{% validation src=&quot;./exercises/ch10/validation_c.js&quot; %}<br>{% context src=&quot;./exercises/support.js&quot; %}<br>{% endexercise %}  </p>
